@@ -4,6 +4,7 @@ import { Alert, View } from 'react-native';
 import { GoalEditor } from '@/components/GoalEditor';
 import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, ChoiceChip } from '@/components/ui/Button';
+import { Callout, CalloutText } from '@/components/ui/Callout';
 import { Field } from '@/components/ui/Field';
 import { Screen } from '@/components/ui/Screen';
 import { ACTIVITY_LEVEL_OPTIONS, SEX_OPTIONS } from '@/lib/copy';
@@ -160,10 +161,10 @@ export default function SettingsScreen() {
 
 function CardMetrics({ tdee, min, max }: { tdee: number; min: number; max: number }) {
   return (
-    <View className="mt-4 rounded-3xl border border-line bg-paper p-4">
-      <AppText tone="muted" className="text-sm">
-        TDEE actual {tdee} kcal · rango seguro {min}–{max}
-      </AppText>
-    </View>
+      <Callout className="mt-4">
+        <CalloutText>
+          TDEE actual {tdee} kcal. El presupuesto no puede salir del rango seguro {min}–{max} kcal.
+        </CalloutText>
+      </Callout>
   );
 }

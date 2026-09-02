@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Callout, CalloutText } from '@/components/ui/Callout';
 import { HelpText, AppText } from '@/components/ui/AppText';
 import { ChoiceChip } from '@/components/ui/Button';
 import { GOAL_OPTIONS } from '@/lib/copy';
@@ -96,11 +97,13 @@ export function GoalEditor({
       <AppText tone="muted" className="mt-1 text-xs">
         {bounds.min} — {bounds.max} kcal
       </AppText>
-      <HelpText>
-        {goalType === 'gain'
-          ? `Para subir, el presupuesto vive entre tu gasto (${tdee}) y el tope seguro (${healthyRangeMax}). La app no deja salir de ese tramo.`
-          : `Para ${goalType === 'lose' ? 'bajar' : 'mantener'}, el presupuesto vive entre el piso seguro (${healthyRangeMin}) y tu gasto (${tdee}). Así no recortás de más.`}
-      </HelpText>
+      <Callout className="mt-3">
+        <CalloutText>
+          {goalType === 'gain'
+            ? `Para subir, el presupuesto vive entre tu gasto (${tdee}) y el tope seguro (${healthyRangeMax}). La app no deja salir de ese tramo.`
+            : `Para ${goalType === 'lose' ? 'bajar' : 'mantener'}, el presupuesto vive entre el piso seguro (${healthyRangeMin}) y tu gasto (${tdee}). Así no recortás de más.`}
+        </CalloutText>
+      </Callout>
     </View>
   );
 }

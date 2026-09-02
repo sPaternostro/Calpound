@@ -3,10 +3,13 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { GoalEditor } from '@/components/GoalEditor';
+import { OnboardingProgress } from '@/components/OnboardingProgress';
 import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, Card, ChoiceChip } from '@/components/ui/Button';
+import { Callout, CalloutText } from '@/components/ui/Callout';
 import { Field } from '@/components/ui/Field';
 import { Screen } from '@/components/ui/Screen';
+import { SummaryRow } from '@/components/ui/SummaryRow';
 import {
   calculateHealthyRange,
   calculateTdee,
@@ -14,7 +17,7 @@ import {
 } from '@/lib/calculations';
 import { ACTIVITY_LEVEL_OPTIONS, GOAL_OPTIONS, SEX_OPTIONS } from '@/lib/copy';
 import { useAppStore } from '@/lib/store';
-import type { ActivityLevel, ActivityPreference, GoalType, Sex } from '@/lib/types';
+import type { ActivityLevel, ActivityPreference, AppMode, GoalType, Sex } from '@/lib/types';
 
 type Draft = {
   age: string;
@@ -25,6 +28,7 @@ type Draft = {
   goalType: GoalType;
   dailyGoal: number;
   activityPreference: ActivityPreference;
+  mode: AppMode;
 };
 
 const INITIAL: Draft = {
@@ -36,7 +40,19 @@ const INITIAL: Draft = {
   goalType: 'lose',
   dailyGoal: 0,
   activityPreference: 'low_impact',
+  mode: 'normal',
 };
+
+function NumberedBullet({ n, children }: { n: number; children: string }) {
+  return (
+    <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
+      <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-forest">
+        <AppText className="text-xs font-semibold text-paper">{n}</AppText>
+      </View>
+      <AppText className="flex-1 leading-5">{children}</AppText>
+    </View>
+  );
+}
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -92,7 +108,7 @@ export default function OnboardingScreen() {
       healthyRangeMin: metrics.min,
       healthyRangeMax: metrics.max,
       dailyGoal: draft.dailyGoal,
-      mode: 'normal',
+      mode: draft.mode,
       activityPreference: draft.activityPreference,
     });
     router.replace('/(tabs)');
@@ -100,12 +116,10 @@ export default function OnboardingScreen() {
 
   return (
     <Screen>
-      <AppText tone="bronze" className="text-xs font-semibold uppercase tracking-[2px]">
-        Calpound · paso {step + 1} de 5
-      </AppText>
+      <OnboardingProgress current={step + 1} />
 
       {step === 0 && (
-        <View className="mt-4">
+        <View>
           <Title>Tu presupuesto de energía</Title>
           <AppText tone="muted" className="mt-3 text-base leading-6">
             Calpound trata las calorías como un presupuesto: definís un rango saludable, vas
@@ -113,18 +127,16 @@ export default function OnboardingScreen() {
             banco para usarlo después.
           </AppText>
           <View className="mt-6 gap-3">
-            <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
-              <AppText className="mr-3 text-lg">◎</AppText>
-              <AppText className="flex-1 leading-5">Definís tu rango saludable y un presupuesto diario.</AppText>
-            </View>
-            <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
-              <AppText className="mr-3 text-lg">+</AppText>
-              <AppText className="flex-1 leading-5">Cada día en rango suma al banco.</AppText>
-            </View>
-            <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
-              <AppText className="mr-3 text-lg">→</AppText>
-              <AppText className="flex-1 leading-5">Gastás el ahorro cuando quieras, en algo puntual.</AppText>
-            </View>
+            <NumberedBullet n={1}>
+              Definís tu rango saludable y un presupuesto diario.
+            </NumberedBullet>
+            <NumberedBullet n={2}>
+              Cada día en rango suma al banco; gastás el ahorro cuando quieras, en algo puntual.
+            </NumberedBullet>
+            <NumberedBullet n={3}>
+              El tono es de presupuesto, no de culpa: un día fuera de rango simplemente no suma
+              saldo, y al siguiente arrancás de nuevo.
+            </NumberedBullet>
           </View>
           <View className="mt-8">
             <Button label="Empezar" onPress={() => setStep(1)} />
@@ -133,7 +145,7 @@ export default function OnboardingScreen() {
       )}
 
       {step === 1 && (
-        <View className="mt-4">
+        <View>
           <Title>Contanos un poco de vos</Title>
           <AppText tone="muted" className="mt-2 mb-5">
             Usamos Mifflin-St Jeor, una fórmula estándar, para estimar cuánta energía gastás en un
@@ -198,25 +210,23 @@ export default function OnboardingScreen() {
       )}
 
       {step === 2 && metrics && (
-        <View className="mt-4">
+        <View>
           <Title>Tu rango saludable</Title>
-          <Card className="mt-5">
-            <AppText tone="muted" className="text-sm">
-              Gasto estimado (TDEE)
-            </AppText>
-            <AppText className="text-3xl font-semibold text-forest">{metrics.tdee} kcal</AppText>
-            <HelpText>
-              El TDEE es una estimación con una fórmula estándar (Mifflin-St Jeor). Puede variar
-              según tu composición corporal: es una brújula, no un número exacto.
-            </HelpText>
-            <AppText tone="muted" className="mt-3 text-sm">
-              Piso seguro {metrics.min} · Tope seguro {metrics.max}
-            </AppText>
+          <Card className="mt-5 p-5">
+            <SummaryRow label="Gasto estimado (TDEE)" value={`${metrics.tdee} kcal`} />
+            <SummaryRow
+              label="Rango seguro"
+              value={`${metrics.min} – ${metrics.max} kcal`}
+              last
+            />
           </Card>
-          <HelpText>
-            El TDEE es una estimación de lo que tu cuerpo usa en un día típico. El piso y el tope
-            son límites de seguridad: la app no deja configurar un objetivo fuera de ese corredor.
-          </HelpText>
+          <Callout className="mt-3">
+            <CalloutText>
+              El TDEE es una estimación con Mifflin-St Jeor: puede variar según tu composición
+              corporal. El piso y el tope son límites de seguridad; la app no deja configurar un
+              objetivo fuera de ese corredor.
+            </CalloutText>
+          </Callout>
           <View className="mt-8">
             <GoalEditor
               goalType={draft.goalType}
@@ -239,7 +249,7 @@ export default function OnboardingScreen() {
       )}
 
       {step === 3 && (
-        <View className="mt-4">
+        <View>
           <Title>¿Cómo preferís moverte?</Title>
           <AppText tone="muted" className="mt-2 mb-5">
             Elegilo vos. Calpound no infiere intensidad según tu peso o tu altura: solo filtra las
@@ -273,45 +283,72 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      {step === 4 && metrics && (
-        <View className="mt-4">
-          <Title>Un aviso importante</Title>
-          <Card className="mt-5">
-            <AppText tone="muted" className="text-sm">
-              Esto es lo que vas a crear
-            </AppText>
-            <AppText className="mt-2 text-lg font-semibold">
-              TDEE {metrics.tdee} kcal
-            </AppText>
-            <AppText tone="muted" className="mt-1">
-              Rango seguro {metrics.min}–{metrics.max} kcal
-            </AppText>
-            <AppText className="mt-2">
-              Meta:{' '}
-              {GOAL_OPTIONS.find((item) => item.value === draft.goalType)?.label ?? draft.goalType}
-            </AppText>
-            <AppText className="mt-1 font-medium text-forest">
-              Presupuesto diario: {draft.dailyGoal} kcal
-            </AppText>
-            <AppText tone="muted" className="mt-2 text-sm">
-              Movimiento:{' '}
-              {draft.activityPreference === 'low_impact' ? 'bajo impacto' : 'más intensa'}
-            </AppText>
-          </Card>
-          <Card className="mt-4">
-            <AppText className="leading-6">
-              Calpound es una herramienta de organización, no un profesional de la salud. No
-              reemplaza asesoramiento nutricional ni médico. Si tenés una condición clínica, estás
-              embarazada o tenés dudas, consultá con alguien formado.
-            </AppText>
-          </Card>
+      {step === 4 && (
+        <View>
+          <Title>¿Cómo querés usar Calpound?</Title>
+          <AppText tone="muted" className="mt-2 mb-5">
+            Los dos modos respetan las mismas reglas de presupuesto. Solo cambia el énfasis visual.
+          </AppText>
+          <View className="flex-row flex-wrap">
+            <ChoiceChip
+              label="Normal"
+              selected={draft.mode === 'normal'}
+              onPress={() => setDraft((p) => ({ ...p, mode: 'normal' }))}
+            />
+            <ChoiceChip
+              label="Tryhard"
+              selected={draft.mode === 'tryhard'}
+              onPress={() => setDraft((p) => ({ ...p, mode: 'tryhard' }))}
+            />
+          </View>
           <HelpText>
-            El tono de la app es de presupuesto, no de culpa: un día fuera de rango simplemente no
-            suma saldo, y al siguiente arrancás de nuevo.
+            {draft.mode === 'normal'
+              ? 'Dashboard simple: ves el día, el banco y la racha sin ruido extra.'
+              : 'Más énfasis en la racha actual y en compararla con tu mejor marca histórica.'}
           </HelpText>
           <View className="mt-8 flex-row gap-3">
             <View className="flex-1">
               <Button label="Atrás" variant="ghost" onPress={() => setStep(3)} />
+            </View>
+            <View className="flex-1">
+              <Button label="Continuar" onPress={() => setStep(5)} />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {step === 5 && metrics && (
+        <View>
+          <Title>Confirmá tu presupuesto</Title>
+          <Card className="mt-5 p-5">
+            <AppText className="mb-1 text-lg font-semibold">Esto es lo que vas a crear</AppText>
+            <SummaryRow label="Gasto estimado (TDEE)" value={`${metrics.tdee} kcal`} />
+            <SummaryRow label="Rango seguro" value={`${metrics.min} – ${metrics.max} kcal`} />
+            <SummaryRow
+              label="Meta"
+              value={GOAL_OPTIONS.find((item) => item.value === draft.goalType)?.label ?? draft.goalType}
+            />
+            <SummaryRow label="Presupuesto diario" value={`${draft.dailyGoal} kcal`} />
+            <SummaryRow
+              label="Movimiento"
+              value={draft.activityPreference === 'low_impact' ? 'Bajo impacto' : 'Más intensa'}
+            />
+            <SummaryRow
+              label="Modo"
+              value={draft.mode === 'normal' ? 'Normal' : 'Tryhard'}
+              last
+            />
+          </Card>
+          <Callout className="mt-4">
+            <CalloutText>
+              Calpound es una herramienta de organización, no un profesional de la salud. No
+              reemplaza asesoramiento nutricional ni médico. Si tenés una condición clínica, estás
+              embarazada o tenés dudas, consultá con alguien formado.
+            </CalloutText>
+          </Callout>
+          <View className="mt-8 flex-row gap-3">
+            <View className="flex-1">
+              <Button label="Atrás" variant="ghost" onPress={() => setStep(4)} />
             </View>
             <View className="flex-1">
               <Button label="Crear mi presupuesto" onPress={finish} />

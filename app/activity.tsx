@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 
 import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, Card } from '@/components/ui/Button';
+import { Callout, CalloutText } from '@/components/ui/Callout';
 import { Screen } from '@/components/ui/Screen';
 import { activitiesFor, estimateActivityCalories } from '@/lib/activities';
 import { capExerciseCredit, EXERCISE_CREDIT_CAP_RATIO } from '@/lib/calculations';
@@ -41,10 +42,12 @@ export default function ActivityScreen() {
     <Screen safeTop={false}>
       <Title className="text-2xl">Sumar movimiento</Title>
       <HelpText>{hint}</HelpText>
-      <AppText tone="muted" className="mt-2 text-sm">
-        Crédito ya usado hoy: {Math.round(log.exerciseCredit)} / {cap} kcal (tope del 30% del
-        presupuesto).
-      </AppText>
+      <Callout className="mt-3">
+        <CalloutText>
+          Crédito de movimiento topeado al 30% del presupuesto: {Math.round(log.exerciseCredit)} /{' '}
+          {cap} kcal usados hoy.
+        </CalloutText>
+      </Callout>
 
       <View className="mt-4">
         {options.map((item) => (
@@ -81,9 +84,12 @@ export default function ActivityScreen() {
         <AppText tone="muted">Crédito que se va a sumar</AppText>
         <AppText className="text-2xl font-semibold text-forest">{creditToday} kcal</AppText>
         {creditToday < estimate ? (
-          <HelpText>
-            La estimación era {estimate} kcal; el tope diario deja {creditToday} de crédito para hoy.
-          </HelpText>
+          <Callout className="mt-3">
+            <CalloutText>
+              La estimación era {estimate} kcal; el tope diario deja {creditToday} de crédito para
+              hoy.
+            </CalloutText>
+          </Callout>
         ) : null}
       </Card>
 

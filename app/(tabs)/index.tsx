@@ -35,6 +35,8 @@ export default function HomeScreen() {
   const [editCalories, setEditCalories] = useState('');
   const [editType, setEditType] = useState('');
   const [editMinutes, setEditMinutes] = useState('');
+  const [foodError, setFoodError] = useState<string | null>(null);
+  const [exerciseError, setExerciseError] = useState<string | null>(null);
 
   if (!profile || !log) return null;
 
@@ -137,6 +139,7 @@ export default function HomeScreen() {
               setEditingFoodId(item.id);
               setEditName(item.name);
               setEditCalories(String(item.calories));
+              setFoodError(null);
             }}
             onLongPress={() => removeFood(item.id)}
             className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
@@ -162,6 +165,7 @@ export default function HomeScreen() {
               setEditingExerciseId(item.id);
               setEditType(item.type);
               setEditMinutes(String(item.durationMinutes));
+              setExerciseError(null);
             }}
             onLongPress={() => removeExercise(item.id)}
             className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
@@ -202,18 +206,35 @@ export default function HomeScreen() {
               label="Calorías"
               keyboardType="number-pad"
               value={editCalories}
-              onChangeText={setEditCalories}
+              onChangeText={(value) => {
+                setEditCalories(value);
+                setFoodError(null);
+              }}
               help="Ajustá el número si la porción no era exactamente esa."
             />
+            {foodError ? (
+              <AppText tone="bronze" className="mb-3 text-sm">
+                {foodError}
+              </AppText>
+            ) : null}
             <Button
               label="Guardar"
               onPress={() => {
-                if (!editingFoodId || !editName.trim() || !Number(editCalories)) return;
+                const calories = Number(editCalories);
+                if (!editingFoodId || !editName.trim() || Number.isNaN(calories) || calories < 0) {
+                  setFoodError(
+                    !editName.trim()
+                      ? 'Indicá un nombre para reconocerlo.'
+                      : 'Las calorías tienen que ser un número de 0 o más.',
+                  );
+                  return;
+                }
                 updateFood(editingFoodId, {
                   name: editName,
-                  calories: Number(editCalories),
+                  calories,
                 });
                 setEditingFoodId(null);
+                setFoodError(null);
               }}
             />
             <View className="mt-2">
@@ -243,18 +264,40 @@ export default function HomeScreen() {
               label="Duración (min)"
               keyboardType="number-pad"
               value={editMinutes}
-              onChangeText={setEditMinutes}
+              onChangeText={(value) => {
+                setEditMinutes(value);
+                setExerciseError(null);
+              }}
               help="Al guardar, el crédito del día se vuelve a calcular y se respeta el tope del 30%."
             />
+            {exerciseError ? (
+              <AppText tone="bronze" className="mb-3 text-sm">
+                {exerciseError}
+              </AppText>
+            ) : null}
             <Button
               label="Guardar"
               onPress={() => {
-                if (!editingExerciseId || !editType.trim() || !Number(editMinutes)) return;
+                const minutes = Number(editMinutes);
+                if (
+                  !editingExerciseId ||
+                  !editType.trim() ||
+                  Number.isNaN(minutes) ||
+                  minutes < 1
+                ) {
+                  setExerciseError(
+                    !editType.trim()
+                      ? 'Indicá un tipo de actividad.'
+                      : 'La duración tiene que ser de al menos 1 minuto.',
+                  );
+                  return;
+                }
                 updateExercise(editingExerciseId, {
                   type: editType,
-                  durationMinutes: Number(editMinutes),
+                  durationMinutes: minutes,
                 });
                 setEditingExerciseId(null);
+                setExerciseError(null);
               }}
             />
             <View className="mt-2">
