@@ -50,6 +50,12 @@ export default function SettingsScreen() {
 
       <AppText className="mb-2 mt-5 font-semibold">Perfil</AppText>
       <Field
+        label="Nombre (opcional)"
+        defaultValue={profile.name ?? ''}
+        onEndEditing={(e) => updateProfile({ name: e.nativeEvent.text.trim() || undefined })}
+        help="Si lo cargás, Home te saluda por tu nombre."
+      />
+      <Field
         label="Edad"
         keyboardType="number-pad"
         defaultValue={String(profile.age)}
@@ -152,10 +158,63 @@ export default function SettingsScreen() {
         Esto solo filtra las sugerencias de movimiento. No se calcula según tu BMI ni tu contextura.
       </HelpText>
 
+      <AppText className="mb-2 mt-6 font-semibold">Comidas sin culpa</AppText>
+      <HelpText>
+        Comidas que solés disfrutar pero te generan culpa. Las dejamos siempre a mano para que las
+        puedas comer dentro de tu presupuesto, sin tener que “ganarlas”. Hasta 3.
+      </HelpText>
+      <GuiltFreeEditor
+        foods={profile.guiltFreeFoods ?? []}
+        onChange={(guiltFreeFoods) => updateProfile({ guiltFreeFoods })}
+      />
+
       <View className="mt-8">
         <Button label="Borrar todos los datos" variant="ghost" onPress={confirmReset} />
       </View>
     </Screen>
+  );
+}
+
+function GuiltFreeEditor({
+  foods,
+  onChange,
+}: {
+  foods: { name: string; calories: number }[];
+  onChange: (foods: { name: string; calories: number }[]) => void;
+}) {
+  const slots = [0, 1, 2].map((index) => foods[index] ?? { name: '', calories: 0 });
+
+  const patchSlot = (index: number, name: string, caloriesRaw: string) => {
+    const next = slots.map((item, i) =>
+      i === index
+        ? { name: name.trim(), calories: Math.max(0, Math.round(Number(caloriesRaw) || 0)) }
+        : item,
+    );
+    onChange(next.filter((item) => item.name.length > 0 && item.calories > 0));
+  };
+
+  return (
+    <View className="mt-3">
+      {slots.map((item, index) => (
+        <View key={index} className="mb-2 flex-row gap-2">
+          <View className="flex-1">
+            <Field
+              label={index === 0 ? 'Nombre' : ''}
+              defaultValue={item.name}
+              onEndEditing={(e) => patchSlot(index, e.nativeEvent.text, String(item.calories))}
+            />
+          </View>
+          <View className="w-28">
+            <Field
+              label={index === 0 ? 'Kcal' : ''}
+              keyboardType="number-pad"
+              defaultValue={item.calories ? String(item.calories) : ''}
+              onEndEditing={(e) => patchSlot(index, item.name, e.nativeEvent.text)}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 

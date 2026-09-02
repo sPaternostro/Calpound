@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, Card } from '@/components/ui/Button';
@@ -11,9 +11,16 @@ import { useAppStore } from '@/lib/store';
 export default function BankScreen() {
   const savings = useAppStore((s) => s.savings);
   const spendSavings = useAppStore((s) => s.spendSavings);
+  const profile = useAppStore((s) => s.profile);
+  const addFood = useAppStore((s) => s.addFood);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [logged, setLogged] = useState<string | null>(null);
+
+  const guiltFree = (profile?.guiltFreeFoods ?? []).filter(
+    (item) => item.name.trim() && item.calories > 0,
+  );
 
   const onSpend = () => {
     const result = spendSavings(Number(amount), note);
@@ -31,6 +38,42 @@ export default function BankScreen() {
         Acá se junta lo que ahorraste (o sumaste) en los días que quedaron dentro del rango. Podés
         “gastarlo” en una comida especial, un extra o lo que elijas.
       </HelpText>
+
+      {guiltFree.length > 0 ? (
+        <View className="mt-5">
+          <AppText className="mb-1 font-semibold">Registrar sin culpa</AppText>
+          <HelpText>
+            Siempre a mano, dentro del presupuesto de hoy. No hace falta saldo ni desbloquearlas.
+          </HelpText>
+          {guiltFree.map((item) => (
+            <View
+              key={item.name}
+              className="mt-2 flex-row items-center justify-between rounded-2xl border border-line bg-paper px-4 py-3">
+              <View className="flex-1 pr-3">
+                <AppText className="font-medium">{item.name}</AppText>
+                <AppText tone="muted" className="text-xs">
+                  {item.calories} kcal
+                </AppText>
+              </View>
+              <Pressable
+                onPress={() => {
+                  addFood({ name: item.name, calories: item.calories, source: 'manual' });
+                  setLogged(`${item.name} sumado al día`);
+                }}
+                className="rounded-full bg-forest px-3 py-2">
+                <AppText tone="paper" className="text-xs font-semibold">
+                  Registrar
+                </AppText>
+              </Pressable>
+            </View>
+          ))}
+          {logged ? (
+            <AppText tone="forest" className="mt-2 text-sm">
+              {logged}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
 
       <Card className="mt-5">
         <AppText tone="muted">Saldo disponible</AppText>

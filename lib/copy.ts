@@ -36,3 +36,14 @@ export const PORTION_HINTS = [
   'Una cucharada de aceite ≈ la yema del pulgar (~120 kcal).',
   'Una pechuga de pollo del tamaño de la palma ≈ 150–180 kcal.',
 ];
+
+export const SATIETY_TIPS = [
+  'Un vaso de agua antes de sentarte a comer ayuda a registrar el hambre real.',
+  'Alimentos con fibra (verduras, legumbres, avena) suelen rendir más saciedad por caloría.',
+  'Una porción de proteína en el plato suele hacer que el presupuesto rinda más horas.',
+  'Comer despacio le da tiempo al cuerpo a registrar que ya hay comida.',
+  'Empezar el plato por las verduras deja menos espacio para el resto, sin recortar de golpe.',
+  'Si tenés sed, a veces se siente parecido al hambre: un vaso de agua es un buen primer paso.',
+  'Masticar bien y dejar el cubierto entre bocados estira la comida sin sumar calorías.',
+  'Un plato más chico hace que la misma porción se vea completa, y es más fácil de registrar.',
+];

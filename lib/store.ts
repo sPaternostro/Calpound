@@ -10,6 +10,7 @@ import {
   rebuildProfileMetrics,
 } from './calculations';
 import { createId, todayKey } from './dates';
+import { derivePoints } from './levels';
 import { bestStreak, currentStreak, validDaysInWeek } from './streaks';
 import type {
   Achievement,
@@ -36,6 +37,8 @@ export interface AppState {
   savings: SavingsBalance;
   achievements: Achievement[];
   catalog: CatalogFood[];
+  effortPoints: number;
+  enjoymentPoints: number;
   setHasHydrated: (value: boolean) => void;
   completeOnboarding: (profile: UserProfile) => void;
   updateProfile: (patch: Partial<UserProfile>) => void;
@@ -58,7 +61,11 @@ export interface AppState {
   resetAll: () => void;
 }
 
-const emptySavings = (): SavingsBalance => ({ totalSaved: 0, history: [] });
+function withPoints<T extends { dailyLogs: Record<string, DailyLog>; savings: SavingsBalance }>(
+  slice: T,
+): T & { effortPoints: number; enjoymentPoints: number } {
+  return { ...slice, ...derivePoints(slice.dailyLogs, slice.savings) };
+}
 
 function upsertCatalog(catalog: CatalogFood[], entry: FoodEntry): CatalogFood[] {
   const key = entry.name.trim().toLowerCase();
@@ -169,6 +176,8 @@ const initialSlice = {
   savings: emptySavings(),
   achievements: seedAchievements(),
   catalog: [] as CatalogFood[],
+  effortPoints: 0,
+  enjoymentPoints: 0,
 };
 
 export const useAppStore = create<AppState>()(
@@ -184,7 +193,7 @@ export const useAppStore = create<AppState>()(
           achievements: seedAchievements(),
         });
         const computed = recomputeDate(get(), todayKey());
-        set(computed);
+        set(withPoints({ ...computed, dailyLogs: computed.dailyLogs, savings: computed.savings }));
       },
       updateProfile: (patch) => {
         const current = get().profile;
@@ -207,12 +216,14 @@ export const useAppStore = create<AppState>()(
           savings = computed.savings;
         });
         const withLogs = { ...next, profile, dailyLogs, savings };
-        set({
-          profile,
-          dailyLogs,
-          savings,
-          achievements: unlockAchievements(withLogs as AppState),
-        });
+        set(
+          withPoints({
+            profile,
+            dailyLogs,
+            savings,
+            achievements: unlockAchievements(withLogs as AppState),
+          }),
+        );
       },
       addFood: (input) => {
         const date = input.date ?? todayKey();
@@ -227,12 +238,14 @@ export const useAppStore = create<AppState>()(
         const catalog = upsertCatalog(get().catalog, entry);
         const computed = recomputeDate({ ...get(), foodEntries }, date);
         const next = { ...get(), foodEntries, catalog, ...computed };
-        set({
-          foodEntries,
-          catalog,
-          ...computed,
-          achievements: unlockAchievements(next as AppState),
-        });
+        set(
+          withPoints({
+            foodEntries,
+            catalog,
+            ...computed,
+            achievements: unlockAchievements(next as AppState),
+          }),
+        );
       },
       updateFood: (id, patch) => {
         const target = get().foodEntries.find((item) => item.id === id);
@@ -250,14 +263,14 @@ export const useAppStore = create<AppState>()(
             : item,
         );
         const computed = recomputeDate({ ...get(), foodEntries }, target.date);
-        set({ foodEntries, ...computed });
+        set(withPoints({ foodEntries, ...computed }));
       },
       removeFood: (id) => {
         const target = get().foodEntries.find((item) => item.id === id);
         const foodEntries = get().foodEntries.filter((item) => item.id !== id);
         if (!target) return;
         const computed = recomputeDate({ ...get(), foodEntries }, target.date);
-        set({ foodEntries, ...computed });
+        set(withPoints({ foodEntries, ...computed }));
       },
       toggleFavorite: (name) => {
         const key = name.trim().toLowerCase();
@@ -289,11 +302,13 @@ export const useAppStore = create<AppState>()(
         const exerciseEntries = [entry, ...get().exerciseEntries];
         const computed = recomputeDate({ ...get(), exerciseEntries }, date);
         const next = { ...get(), exerciseEntries, ...computed };
-        set({
-          exerciseEntries,
-          ...computed,
-          achievements: unlockAchievements(next as AppState),
-        });
+        set(
+          withPoints({
+            exerciseEntries,
+            ...computed,
+            achievements: unlockAchievements(next as AppState),
+          }),
+        );
       },
       updateExercise: (id, patch) => {
         const profile = get().profile;
@@ -324,14 +339,14 @@ export const useAppStore = create<AppState>()(
             : item,
         );
         const computed = recomputeDate({ ...get(), exerciseEntries }, target.date);
-        set({ exerciseEntries, ...computed });
+        set(withPoints({ exerciseEntries, ...computed }));
       },
       removeExercise: (id) => {
         const target = get().exerciseEntries.find((item) => item.id === id);
         const exerciseEntries = get().exerciseEntries.filter((item) => item.id !== id);
         if (!target) return;
         const computed = recomputeDate({ ...get(), exerciseEntries }, target.date);
-        set({ exerciseEntries, ...computed });
+        set(withPoints({ exerciseEntries, ...computed }));
       },
       spendSavings: (amount, note) => {
         const rounded = Math.round(amount);
@@ -353,10 +368,13 @@ export const useAppStore = create<AppState>()(
           history: [movement, ...get().savings.history],
         };
         const next = { ...get(), savings };
-        set({
-          savings,
-          achievements: unlockAchievements(next as AppState),
-        });
+        set(
+          withPoints({
+            savings,
+            dailyLogs: get().dailyLogs,
+            achievements: unlockAchievements(next as AppState),
+          }),
+        );
         return { ok: true, message: 'Listo, el saldo ya está actualizado.' };
       },
       resetAll: () => {
@@ -375,7 +393,17 @@ export const useAppStore = create<AppState>()(
         savings: state.savings,
         achievements: state.achievements,
         catalog: state.catalog,
+        effortPoints: state.effortPoints,
+        enjoymentPoints: state.enjoymentPoints,
       }),
+      merge: (persisted, current) => {
+        const saved = (persisted as Partial<AppState>) ?? {};
+        const merged = { ...current, ...saved };
+        return {
+          ...merged,
+          ...derivePoints(merged.dailyLogs ?? {}, merged.savings ?? emptySavings()),
+        };
+      },
       skipHydration: false,
     },
   ),

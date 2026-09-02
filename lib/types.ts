@@ -7,7 +7,13 @@ export type FoodSource = 'search' | 'barcode' | 'manual';
 export type MovementType = 'earned' | 'spent';
 export type AchievementType = 'streak' | 'milestone' | 'consistency';
 
+export interface GuiltFreeFood {
+  name: string;
+  calories: number;
+}
+
 export interface UserProfile {
+  name?: string;
   age: number;
   weightKg: number;
   heightCm: number;
@@ -20,6 +26,7 @@ export interface UserProfile {
   dailyGoal: number;
   mode: AppMode;
   activityPreference: ActivityPreference;
+  guiltFreeFoods?: GuiltFreeFood[];
 }
 
 export interface FoodEntry {

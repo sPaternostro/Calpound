@@ -1,12 +1,13 @@
-import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Alert, Modal, Pressable, View } from 'react-native';
+import { Link, useRouter } from 'expo-router';
 
 import { BudgetBar } from '@/components/ui/BudgetBar';
 import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, Card } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Screen } from '@/components/ui/Screen';
+import { SATIETY_TIPS } from '@/lib/copy';
 import { formatKcal } from '@/lib/dates';
 import {
   selectTodayExercise,
@@ -16,6 +17,10 @@ import {
 } from '@/lib/store';
 import { bestStreak, currentStreak } from '@/lib/streaks';
 import { useShallow } from 'zustand/react/shallow';
+
+type MenuTarget =
+  | { kind: 'food'; id: string; label: string }
+  | { kind: 'exercise'; id: string; label: string };
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -37,40 +42,97 @@ export default function HomeScreen() {
   const [editMinutes, setEditMinutes] = useState('');
   const [foodError, setFoodError] = useState<string | null>(null);
   const [exerciseError, setExerciseError] = useState<string | null>(null);
+  const [menu, setMenu] = useState<MenuTarget | null>(null);
+  const [tip] = useState(
+    () => SATIETY_TIPS[Math.floor(Math.random() * SATIETY_TIPS.length)] ?? SATIETY_TIPS[0],
+  );
 
   if (!profile || !log) return null;
 
   const streak = currentStreak(logs);
   const historic = bestStreak(logs);
   const tryhard = profile.mode === 'tryhard';
+  const greeting = profile.name?.trim() ? `Hoy, ${profile.name.trim()}` : 'Hoy';
   const remaining =
     profile.goalType === 'gain'
       ? Math.max(0, profile.dailyGoal - log.totalConsumed)
       : Math.max(0, profile.dailyGoal + log.exerciseCredit - log.totalConsumed);
+
+  const openFoodEdit = (id: string) => {
+    const item = foods.find((entry) => entry.id === id);
+    if (!item) return;
+    setEditingFoodId(item.id);
+    setEditName(item.name);
+    setEditCalories(String(item.calories));
+    setFoodError(null);
+  };
+
+  const openExerciseEdit = (id: string) => {
+    const item = exercises.find((entry) => entry.id === id);
+    if (!item) return;
+    setEditingExerciseId(item.id);
+    setEditType(item.type);
+    setEditMinutes(String(item.durationMinutes));
+    setExerciseError(null);
+  };
+
+  const confirmDelete = (target: MenuTarget) => {
+    Alert.alert('¿Eliminar esta entrada?', 'Se saca del registro de hoy y se vuelve a calcular el presupuesto.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () => {
+          if (target.kind === 'food') removeFood(target.id);
+          else removeExercise(target.id);
+        },
+      },
+    ]);
+  };
 
   return (
     <Screen>
       <AppText tone="bronze" className="text-xs font-semibold uppercase tracking-[2px]">
         Calpound
       </AppText>
-      <Title className="mt-1">{tryhard ? 'Hoy, en foco' : 'Hoy'}</Title>
+      <View className="mt-1 flex-row flex-wrap items-center">
+        <Title className="mr-2">{greeting}</Title>
+        {tryhard ? (
+          <View className="rounded-full bg-bronze px-3 py-1">
+            <AppText tone="paper" className="text-xs font-semibold">
+              Modo Foco
+            </AppText>
+          </View>
+        ) : null}
+      </View>
       <HelpText>
         {profile.goalType === 'gain'
           ? 'Tu presupuesto de hoy es un piso: la idea es llegar al objetivo sin pasar el tope seguro.'
           : 'Tu presupuesto de hoy es un techo: lo que no uses, si el día queda en rango, se ahorra.'}
       </HelpText>
 
-      <Card className="mt-5">
-        <View className="flex-row items-end justify-between">
+      <Card className="mt-5 border-forest bg-sage p-5">
+        <AppText tone="muted" className="text-sm">
+          Usado hoy
+        </AppText>
+        <AppText className="text-5xl font-semibold tracking-tight">
+          {formatKcal(log.totalConsumed)}
+        </AppText>
+        <View className="mt-3 flex-row justify-between">
           <View>
-            <AppText tone="muted" className="text-sm">
-              Usado
+            <AppText tone="muted" className="text-xs">
+              {profile.goalType === 'gain' ? 'Falta para el piso' : 'Queda'}
             </AppText>
-            <AppText className="text-3xl font-semibold">{formatKcal(log.totalConsumed)}</AppText>
+            <AppText className="text-lg font-semibold">{formatKcal(remaining)}</AppText>
           </View>
-          <AppText tone="forest" className="font-semibold">
-            {log.isValidDay ? `+${log.saved} en el banco` : 'Aún sin saldo de hoy'}
-          </AppText>
+          <View className="items-end">
+            <AppText tone="muted" className="text-xs">
+              Banco de hoy
+            </AppText>
+            <AppText className="text-lg font-semibold text-forest">
+              {log.isValidDay ? `+${log.saved} kcal` : 'Sin saldo'}
+            </AppText>
+          </View>
         </View>
         <View className="mt-4">
           <BudgetBar
@@ -82,16 +144,14 @@ export default function HomeScreen() {
             goalType={profile.goalType}
           />
         </View>
-        <AppText tone="muted" className="mt-3 text-sm">
-          {profile.goalType === 'gain'
-            ? remaining > 0
-              ? `Te faltan ${formatKcal(remaining)} para el piso del día.`
-              : 'Ya cubriste el piso. El margen hasta el tope es espacio extra.'
-            : remaining > 0
-              ? `Queda ${formatKcal(remaining)} de presupuesto.`
-              : 'Usaste el presupuesto de hoy. El movimiento suma crédito extra si lo registrás.'}
-        </AppText>
       </Card>
+
+      <View className="mt-3 rounded-2xl bg-paper px-4 py-3 border border-line">
+        <AppText tone="muted" className="text-xs uppercase tracking-wide">
+          Tip
+        </AppText>
+        <AppText className="mt-1 text-sm leading-5">{tip}</AppText>
+      </View>
 
       <View className={`mt-4 flex-row gap-3 ${tryhard ? 'flex-col' : ''}`}>
         <Card className="flex-1">
@@ -135,13 +195,7 @@ export default function HomeScreen() {
         foods.map((item) => (
           <Pressable
             key={item.id}
-            onPress={() => {
-              setEditingFoodId(item.id);
-              setEditName(item.name);
-              setEditCalories(String(item.calories));
-              setFoodError(null);
-            }}
-            onLongPress={() => removeFood(item.id)}
+            onPress={() => setMenu({ kind: 'food', id: item.id, label: item.name })}
             className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
             <View className="flex-1 pr-3">
               <AppText className="font-medium">{item.name}</AppText>
@@ -161,13 +215,7 @@ export default function HomeScreen() {
         exercises.map((item) => (
           <Pressable
             key={item.id}
-            onPress={() => {
-              setEditingExerciseId(item.id);
-              setEditType(item.type);
-              setEditMinutes(String(item.durationMinutes));
-              setExerciseError(null);
-            }}
-            onLongPress={() => removeExercise(item.id)}
+            onPress={() => setMenu({ kind: 'exercise', id: item.id, label: item.type })}
             className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
             <View>
               <AppText className="font-medium">{item.type}</AppText>
@@ -179,12 +227,47 @@ export default function HomeScreen() {
           </Pressable>
         ))
       )}
-      <HelpText>Tocá un ítem para editarlo. Manténé presionado para quitarlo.</HelpText>
+      <HelpText>Tocá una entrada para editarla o quitarla.</HelpText>
       <Link href="/(tabs)/bank" className="mt-4">
         <AppText tone="forest" className="font-medium">
           Ir al banco →
         </AppText>
       </Link>
+
+      <Modal visible={menu !== null} transparent animationType="fade" onRequestClose={() => setMenu(null)}>
+        <Pressable className="flex-1 items-center justify-center bg-black/40 px-6" onPress={() => setMenu(null)}>
+          <Pressable className="w-full rounded-3xl border border-line bg-cream p-5" onPress={() => undefined}>
+            <AppText className="mb-1 text-lg font-semibold">{menu?.label}</AppText>
+            <AppText tone="muted" className="mb-4 text-sm">
+              ¿Qué querés hacer?
+            </AppText>
+            <Button
+              label="Editar"
+              onPress={() => {
+                if (!menu) return;
+                if (menu.kind === 'food') openFoodEdit(menu.id);
+                else openExerciseEdit(menu.id);
+                setMenu(null);
+              }}
+            />
+            <View className="mt-2">
+              <Button
+                label="Eliminar entrada"
+                variant="ghost"
+                onPress={() => {
+                  if (!menu) return;
+                  const target = menu;
+                  setMenu(null);
+                  confirmDelete(target);
+                }}
+              />
+            </View>
+            <View className="mt-2">
+              <Button label="Cancelar" variant="ghost" onPress={() => setMenu(null)} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={editingFoodId !== null}
@@ -229,10 +312,7 @@ export default function HomeScreen() {
                   );
                   return;
                 }
-                updateFood(editingFoodId, {
-                  name: editName,
-                  calories,
-                });
+                updateFood(editingFoodId, { name: editName, calories });
                 setEditingFoodId(null);
                 setFoodError(null);
               }}
@@ -279,12 +359,7 @@ export default function HomeScreen() {
               label="Guardar"
               onPress={() => {
                 const minutes = Number(editMinutes);
-                if (
-                  !editingExerciseId ||
-                  !editType.trim() ||
-                  Number.isNaN(minutes) ||
-                  minutes < 1
-                ) {
+                if (!editingExerciseId || !editType.trim() || Number.isNaN(minutes) || minutes < 1) {
                   setExerciseError(
                     !editType.trim()
                       ? 'Indicá un tipo de actividad.'
@@ -292,10 +367,7 @@ export default function HomeScreen() {
                   );
                   return;
                 }
-                updateExercise(editingExerciseId, {
-                  type: editType,
-                  durationMinutes: minutes,
-                });
+                updateExercise(editingExerciseId, { type: editType, durationMinutes: minutes });
                 setEditingExerciseId(null);
                 setExerciseError(null);
               }}

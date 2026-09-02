@@ -20,6 +20,7 @@ import { useAppStore } from '@/lib/store';
 import type { ActivityLevel, ActivityPreference, AppMode, GoalType, Sex } from '@/lib/types';
 
 type Draft = {
+  name: string;
   age: string;
   weightKg: string;
   heightCm: string;
@@ -32,6 +33,7 @@ type Draft = {
 };
 
 const INITIAL: Draft = {
+  name: '',
   age: '30',
   weightKg: '70',
   heightCm: '170',
@@ -98,6 +100,7 @@ export default function OnboardingScreen() {
   const finish = () => {
     if (!metrics) return;
     completeOnboarding({
+      name: draft.name.trim() || undefined,
       age: numbers.age,
       weightKg: numbers.weightKg,
       heightCm: numbers.heightCm,
@@ -151,6 +154,12 @@ export default function OnboardingScreen() {
             Usamos Mifflin-St Jeor, una fórmula estándar, para estimar cuánta energía gastás en un
             día típico (TDEE).
           </AppText>
+          <Field
+            label="Nombre (opcional)"
+            value={draft.name}
+            onChangeText={(name) => setDraft((p) => ({ ...p, name }))}
+            help="Si lo cargás, Home te saluda por tu nombre. Podés dejarlo vacío."
+          />
           <Field
             label="Edad"
             keyboardType="number-pad"
@@ -322,6 +331,9 @@ export default function OnboardingScreen() {
           <Title>Confirmá tu presupuesto</Title>
           <Card className="mt-5 p-5">
             <AppText className="mb-1 text-lg font-semibold">Esto es lo que vas a crear</AppText>
+            {draft.name.trim() ? (
+              <SummaryRow label="Nombre" value={draft.name.trim()} />
+            ) : null}
             <SummaryRow label="Gasto estimado (TDEE)" value={`${metrics.tdee} kcal`} />
             <SummaryRow label="Rango seguro" value={`${metrics.min} – ${metrics.max} kcal`} />
             <SummaryRow
