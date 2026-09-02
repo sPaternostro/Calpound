@@ -177,6 +177,8 @@ export const useAppStore = create<AppState>()(
           profile,
           achievements: seedAchievements(),
         });
+        const computed = recomputeDate(get(), todayKey());
+        set(computed);
       },
       updateProfile: (patch) => {
         const current = get().profile;

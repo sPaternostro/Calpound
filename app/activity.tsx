@@ -9,11 +9,12 @@ import { Screen } from '@/components/ui/Screen';
 import { activitiesFor, estimateActivityCalories } from '@/lib/activities';
 import { capExerciseCredit, EXERCISE_CREDIT_CAP_RATIO } from '@/lib/calculations';
 import { selectTodayLog, useAppStore } from '@/lib/store';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function ActivityScreen() {
   const router = useRouter();
   const profile = useAppStore((s) => s.profile);
-  const log = useAppStore(selectTodayLog);
+  const log = useAppStore(useShallow(selectTodayLog));
   const addExercise = useAppStore((s) => s.addExercise);
   const [activityId, setActivityId] = useState<string | null>(null);
   const [minutes, setMinutes] = useState(30);

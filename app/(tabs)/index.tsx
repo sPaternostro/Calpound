@@ -13,13 +13,14 @@ import {
   useAppStore,
 } from '@/lib/store';
 import { bestStreak, currentStreak } from '@/lib/streaks';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function HomeScreen() {
   const router = useRouter();
   const profile = useAppStore((s) => s.profile);
-  const log = useAppStore(selectTodayLog);
-  const foods = useAppStore(selectTodayFood);
-  const exercises = useAppStore(selectTodayExercise);
+  const log = useAppStore(useShallow(selectTodayLog));
+  const foods = useAppStore(useShallow(selectTodayFood));
+  const exercises = useAppStore(useShallow(selectTodayExercise));
   const logs = useAppStore((s) => s.dailyLogs);
   const savings = useAppStore((s) => s.savings);
   const removeFood = useAppStore((s) => s.removeFood);
