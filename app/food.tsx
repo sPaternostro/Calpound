@@ -11,15 +11,16 @@ import { Screen } from '@/components/ui/Screen';
 import { PORTION_HINTS } from '@/lib/copy';
 import {
   caloriesHint,
+  describeSearchFailure,
   fetchProductByBarcode,
   searchOpenFoodFacts,
   suggestedCalories,
   type OffProduct,
 } from '@/lib/openFoodFacts';
 import { useAppStore } from '@/lib/store';
-import type { FoodSource } from '@/lib/types';
+import type { CatalogFood, FoodSource } from '@/lib/types';
 
-type TabKey = 'search' | 'scan' | 'manual';
+type TabKey = 'search' | 'scan' | 'manual' | 'recents';
 
 export default function FoodScreen() {
   const router = useRouter();
@@ -31,32 +32,48 @@ export default function FoodScreen() {
   const [results, setResults] = useState<OffProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
   const [manualName, setManualName] = useState('');
   const [manualKcal, setManualKcal] = useState('');
   const [scanned, setScanned] = useState<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
-  const favorites = catalog.filter((item) => item.isFavorite);
-  const recents = catalog.slice(0, 8);
+  const recentsList = useMemo(() => {
+    return [...catalog].sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      return b.lastUsedAt.localeCompare(a.lastUsedAt);
+    });
+  }, [catalog]);
 
   useEffect(() => {
     if (tab !== 'search') return;
     const q = query.trim();
-    if (q.length < 2) {
+    if (q.length < 3) {
       setResults([]);
+      setEmptyMessage(null);
+      setError(null);
       return;
     }
     const handle = setTimeout(async () => {
       setLoading(true);
       setError(null);
+      setEmptyMessage(null);
       try {
-        setResults(await searchOpenFoodFacts(q));
-      } catch {
-        setError('No pudimos consultar la base ahora. Probá de nuevo o cargalo a mano.');
+        const found = await searchOpenFoodFacts(q);
+        setResults(found);
+        if (found.length === 0) {
+          setEmptyMessage(
+            'No encontramos coincidencias. Probá otro nombre o cargalo a mano.',
+          );
+        }
+      } catch (err) {
+        console.error('Open Food Facts search failed', err);
+        setResults([]);
+        setError(describeSearchFailure(err));
       } finally {
         setLoading(false);
       }
-    }, 400);
+    }, 600);
     return () => clearTimeout(handle);
   }, [query, tab]);
 
@@ -71,49 +88,22 @@ export default function FoodScreen() {
     router.back();
   };
 
+  const saveFromCatalog = (item: CatalogFood) => {
+    save(item.name, item.calories, item.source, { barcode: item.barcode });
+  };
+
   return (
     <Screen safeTop={false}>
       <HelpText>
-        Buscá por nombre, escaneá el envase o anotá las calorías a mano. Lo que ya usaste queda en
-        favoritos y recientes.
+        Buscá por nombre, escaneá el envase, anotá las calorías a mano o reutilizá algo reciente.
       </HelpText>
 
       <View className="mt-4 flex-row flex-wrap">
         <ChoiceChip label="Buscar" selected={tab === 'search'} onPress={() => setTab('search')} />
         <ChoiceChip label="Escanear código" selected={tab === 'scan'} onPress={() => setTab('scan')} />
         <ChoiceChip label="Manual" selected={tab === 'manual'} onPress={() => setTab('manual')} />
+        <ChoiceChip label="Recientes" selected={tab === 'recents'} onPress={() => setTab('recents')} />
       </View>
-
-      {(favorites.length > 0 || recents.length > 0) && tab !== 'scan' ? (
-        <View className="mt-4">
-          {favorites.length > 0 ? (
-            <>
-              <AppText className="mb-2 font-semibold">Favoritos</AppText>
-              {favorites.map((item) => (
-                <QuickRow
-                  key={`fav-${item.name}`}
-                  name={item.name}
-                  calories={item.calories}
-                  favorite
-                  onPress={() => save(item.name, item.calories, item.source, { barcode: item.barcode })}
-                  onStar={() => toggleFavorite(item.name)}
-                />
-              ))}
-            </>
-          ) : null}
-          <AppText className="mb-2 mt-3 font-semibold">Recientes</AppText>
-          {recents.map((item) => (
-            <QuickRow
-              key={`rec-${item.name}`}
-              name={item.name}
-              calories={item.calories}
-              favorite={item.isFavorite}
-              onPress={() => save(item.name, item.calories, item.source, { barcode: item.barcode })}
-              onStar={() => toggleFavorite(item.name)}
-            />
-          ))}
-        </View>
-      ) : null}
 
       {tab === 'search' && (
         <View className="mt-4">
@@ -122,10 +112,11 @@ export default function FoodScreen() {
             value={query}
             onChangeText={setQuery}
             autoCorrect={false}
-            help="Escribí al menos 2 letras. Los resultados vienen de Open Food Facts, una base abierta de productos."
+            help="Escribí al menos 3 letras. Esperamos un momento antes de buscar para no saturar la base abierta de Open Food Facts."
           />
           {loading ? <ActivityIndicator color="#2F5D50" /> : null}
           {error ? <AppText tone="bronze">{error}</AppText> : null}
+          {!loading && emptyMessage ? <AppText tone="muted">{emptyMessage}</AppText> : null}
           {results.map((product) => {
             const kcal = suggestedCalories(product);
             return (
@@ -184,7 +175,8 @@ export default function FoodScreen() {
                 barcode: product.barcode,
                 servingLabel: product.servingSize,
               });
-            } catch {
+            } catch (err) {
+              console.error('Open Food Facts barcode lookup failed', err);
               setError('No pudimos leer el producto. Podés cargarlo a mano.');
               setTab('manual');
             } finally {
@@ -229,6 +221,31 @@ export default function FoodScreen() {
               disabled={!manualName.trim() || !Number(manualKcal)}
             />
           </View>
+        </View>
+      )}
+
+      {tab === 'recents' && (
+        <View className="mt-4">
+          <HelpText>
+            Favoritos primero, después lo último que usaste. Tocá para sumarlo al día; la estrella lo
+            deja fijo arriba.
+          </HelpText>
+          {recentsList.length === 0 ? (
+            <AppText tone="muted" className="mt-4">
+              Todavía no hay recuerdos. Cuando registres una comida, va a aparecer acá.
+            </AppText>
+          ) : (
+            recentsList.map((item) => (
+              <QuickRow
+                key={`rec-${item.name}`}
+                name={item.name}
+                calories={item.calories}
+                favorite={item.isFavorite}
+                onPress={() => saveFromCatalog(item)}
+                onStar={() => toggleFavorite(item.name)}
+              />
+            ))
+          )}
         </View>
       )}
     </Screen>

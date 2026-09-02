@@ -50,17 +50,36 @@ function mapProduct(product: Record<string, unknown>): OffProduct | null {
 
 export async function searchOpenFoodFacts(query: string): Promise<OffProduct[]> {
   const q = query.trim();
-  if (q.length < 2) return [];
+  if (q.length < 3) return [];
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
     q,
   )}&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,generic_name,brands,nutriments,serving_size,image_front_small_url`;
 
   const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) throw new Error('No se pudo buscar en Open Food Facts');
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
   const data = (await res.json()) as { products?: Record<string, unknown>[] };
   return (data.products ?? [])
     .map(mapProduct)
     .filter((item): item is OffProduct => item !== null);
+}
+
+export function describeSearchFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('network request failed') ||
+    lower.includes('load failed')
+  ) {
+    return 'Sin conexión o la búsqueda no está disponible ahora. En el celular con Expo Go suele andar mejor que en la web.';
+  }
+  if (lower.includes('429') || lower.includes('rate')) {
+    return 'La base de alimentos está pidiendo un respiro. Esperá un minuto y volvé a intentar.';
+  }
+  return 'No pudimos consultar la base ahora. Probá de nuevo o cargalo a mano.';
 }
 
 export async function fetchProductByBarcode(barcode: string): Promise<OffProduct | null> {

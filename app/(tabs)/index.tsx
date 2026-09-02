@@ -1,9 +1,11 @@
 import { Link, useRouter } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, View } from 'react-native';
 
 import { BudgetBar } from '@/components/ui/BudgetBar';
 import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, Card } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import { Screen } from '@/components/ui/Screen';
 import { formatKcal } from '@/lib/dates';
 import {
@@ -25,6 +27,14 @@ export default function HomeScreen() {
   const savings = useAppStore((s) => s.savings);
   const removeFood = useAppStore((s) => s.removeFood);
   const removeExercise = useAppStore((s) => s.removeExercise);
+  const updateFood = useAppStore((s) => s.updateFood);
+  const updateExercise = useAppStore((s) => s.updateExercise);
+  const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
+  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCalories, setEditCalories] = useState('');
+  const [editType, setEditType] = useState('');
+  const [editMinutes, setEditMinutes] = useState('');
 
   if (!profile || !log) return null;
 
@@ -123,6 +133,11 @@ export default function HomeScreen() {
         foods.map((item) => (
           <Pressable
             key={item.id}
+            onPress={() => {
+              setEditingFoodId(item.id);
+              setEditName(item.name);
+              setEditCalories(String(item.calories));
+            }}
             onLongPress={() => removeFood(item.id)}
             className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
             <View className="flex-1 pr-3">
@@ -143,6 +158,11 @@ export default function HomeScreen() {
         exercises.map((item) => (
           <Pressable
             key={item.id}
+            onPress={() => {
+              setEditingExerciseId(item.id);
+              setEditType(item.type);
+              setEditMinutes(String(item.durationMinutes));
+            }}
             onLongPress={() => removeExercise(item.id)}
             className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
             <View>
@@ -155,12 +175,94 @@ export default function HomeScreen() {
           </Pressable>
         ))
       )}
-      <HelpText>Manténé presionado un ítem para quitarlo.</HelpText>
+      <HelpText>Tocá un ítem para editarlo. Manténé presionado para quitarlo.</HelpText>
       <Link href="/(tabs)/bank" className="mt-4">
         <AppText tone="forest" className="font-medium">
           Ir al banco →
         </AppText>
       </Link>
+
+      <Modal
+        visible={editingFoodId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingFoodId(null)}>
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/40 px-6"
+          onPress={() => setEditingFoodId(null)}>
+          <Pressable className="w-full rounded-3xl border border-line bg-cream p-5" onPress={() => undefined}>
+            <AppText className="mb-3 text-lg font-semibold">Editar comida</AppText>
+            <Field
+              label="Nombre"
+              value={editName}
+              onChangeText={setEditName}
+              help="Cambia el nombre si querés reconocerlo mejor la próxima vez."
+            />
+            <Field
+              label="Calorías"
+              keyboardType="number-pad"
+              value={editCalories}
+              onChangeText={setEditCalories}
+              help="Ajustá el número si la porción no era exactamente esa."
+            />
+            <Button
+              label="Guardar"
+              onPress={() => {
+                if (!editingFoodId || !editName.trim() || !Number(editCalories)) return;
+                updateFood(editingFoodId, {
+                  name: editName,
+                  calories: Number(editCalories),
+                });
+                setEditingFoodId(null);
+              }}
+            />
+            <View className="mt-2">
+              <Button label="Cancelar" variant="ghost" onPress={() => setEditingFoodId(null)} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={editingExerciseId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingExerciseId(null)}>
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/40 px-6"
+          onPress={() => setEditingExerciseId(null)}>
+          <Pressable className="w-full rounded-3xl border border-line bg-cream p-5" onPress={() => undefined}>
+            <AppText className="mb-3 text-lg font-semibold">Editar actividad</AppText>
+            <Field
+              label="Tipo"
+              value={editType}
+              onChangeText={setEditType}
+              help="El nombre de la actividad. Si coincide con una sugerida, el crédito se recalcula."
+            />
+            <Field
+              label="Duración (min)"
+              keyboardType="number-pad"
+              value={editMinutes}
+              onChangeText={setEditMinutes}
+              help="Al guardar, el crédito del día se vuelve a calcular y se respeta el tope del 30%."
+            />
+            <Button
+              label="Guardar"
+              onPress={() => {
+                if (!editingExerciseId || !editType.trim() || !Number(editMinutes)) return;
+                updateExercise(editingExerciseId, {
+                  type: editType,
+                  durationMinutes: Number(editMinutes),
+                });
+                setEditingExerciseId(null);
+              }}
+            />
+            <View className="mt-2">
+              <Button label="Cancelar" variant="ghost" onPress={() => setEditingExerciseId(null)} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }

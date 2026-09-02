@@ -12,7 +12,7 @@ import {
   calculateTdee,
   suggestedDailyGoal,
 } from '@/lib/calculations';
-import { ACTIVITY_LEVEL_OPTIONS, SEX_OPTIONS } from '@/lib/copy';
+import { ACTIVITY_LEVEL_OPTIONS, GOAL_OPTIONS, SEX_OPTIONS } from '@/lib/copy';
 import { useAppStore } from '@/lib/store';
 import type { ActivityLevel, ActivityPreference, GoalType, Sex } from '@/lib/types';
 
@@ -112,6 +112,20 @@ export default function OnboardingScreen() {
             registrando el día y lo que queda (o lo que sumás, si tu meta es subir) se ahorra en un
             banco para usarlo después.
           </AppText>
+          <View className="mt-6 gap-3">
+            <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
+              <AppText className="mr-3 text-lg">◎</AppText>
+              <AppText className="flex-1 leading-5">Definís tu rango saludable y un presupuesto diario.</AppText>
+            </View>
+            <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
+              <AppText className="mr-3 text-lg">+</AppText>
+              <AppText className="flex-1 leading-5">Cada día en rango suma al banco.</AppText>
+            </View>
+            <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
+              <AppText className="mr-3 text-lg">→</AppText>
+              <AppText className="flex-1 leading-5">Gastás el ahorro cuando quieras, en algo puntual.</AppText>
+            </View>
+          </View>
           <View className="mt-8">
             <Button label="Empezar" onPress={() => setStep(1)} />
           </View>
@@ -191,6 +205,10 @@ export default function OnboardingScreen() {
               Gasto estimado (TDEE)
             </AppText>
             <AppText className="text-3xl font-semibold text-forest">{metrics.tdee} kcal</AppText>
+            <HelpText>
+              El TDEE es una estimación con una fórmula estándar (Mifflin-St Jeor). Puede variar
+              según tu composición corporal: es una brújula, no un número exacto.
+            </HelpText>
             <AppText tone="muted" className="mt-3 text-sm">
               Piso seguro {metrics.min} · Tope seguro {metrics.max}
             </AppText>
@@ -227,16 +245,18 @@ export default function OnboardingScreen() {
             Elegilo vos. Calpound no infiere intensidad según tu peso o tu altura: solo filtra las
             sugerencias con esta preferencia.
           </AppText>
-          <ChoiceChip
-            label="Bajo impacto"
-            selected={draft.activityPreference === 'low_impact'}
-            onPress={() => setDraft((p) => ({ ...p, activityPreference: 'low_impact' }))}
-          />
-          <ChoiceChip
-            label="Más intensa"
-            selected={draft.activityPreference === 'intense'}
-            onPress={() => setDraft((p) => ({ ...p, activityPreference: 'intense' }))}
-          />
+          <View className="flex-row flex-wrap">
+            <ChoiceChip
+              label="Bajo impacto"
+              selected={draft.activityPreference === 'low_impact'}
+              onPress={() => setDraft((p) => ({ ...p, activityPreference: 'low_impact' }))}
+            />
+            <ChoiceChip
+              label="Más intensa"
+              selected={draft.activityPreference === 'intense'}
+              onPress={() => setDraft((p) => ({ ...p, activityPreference: 'intense' }))}
+            />
+          </View>
           <HelpText>
             {draft.activityPreference === 'low_impact'
               ? 'Vamos a sugerirte cosas como caminar, yoga, bici suave o natación tranquila.'
@@ -253,10 +273,32 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      {step === 4 && (
+      {step === 4 && metrics && (
         <View className="mt-4">
           <Title>Un aviso importante</Title>
           <Card className="mt-5">
+            <AppText tone="muted" className="text-sm">
+              Esto es lo que vas a crear
+            </AppText>
+            <AppText className="mt-2 text-lg font-semibold">
+              TDEE {metrics.tdee} kcal
+            </AppText>
+            <AppText tone="muted" className="mt-1">
+              Rango seguro {metrics.min}–{metrics.max} kcal
+            </AppText>
+            <AppText className="mt-2">
+              Meta:{' '}
+              {GOAL_OPTIONS.find((item) => item.value === draft.goalType)?.label ?? draft.goalType}
+            </AppText>
+            <AppText className="mt-1 font-medium text-forest">
+              Presupuesto diario: {draft.dailyGoal} kcal
+            </AppText>
+            <AppText tone="muted" className="mt-2 text-sm">
+              Movimiento:{' '}
+              {draft.activityPreference === 'low_impact' ? 'bajo impacto' : 'más intensa'}
+            </AppText>
+          </Card>
+          <Card className="mt-4">
             <AppText className="leading-6">
               Calpound es una herramienta de organización, no un profesional de la salud. No
               reemplaza asesoramiento nutricional ni médico. Si tenés una condición clínica, estás

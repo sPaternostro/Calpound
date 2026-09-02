@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { seedAchievements } from './achievements';
+import { ACTIVITY_OPTIONS, estimateActivityCalories } from './activities';
 import {
   capExerciseCredit,
   computeDailyLog,
@@ -39,6 +40,7 @@ export interface AppState {
   completeOnboarding: (profile: UserProfile) => void;
   updateProfile: (patch: Partial<UserProfile>) => void;
   addFood: (input: Omit<FoodEntry, 'id' | 'date'> & { date?: string }) => void;
+  updateFood: (id: string, patch: Partial<Pick<FoodEntry, 'name' | 'calories'>>) => void;
   removeFood: (id: string) => void;
   toggleFavorite: (name: string) => void;
   addExercise: (
@@ -46,6 +48,10 @@ export interface AppState {
       date?: string;
       caloriesCredit: number;
     },
+  ) => void;
+  updateExercise: (
+    id: string,
+    patch: Partial<Pick<ExerciseEntry, 'type' | 'durationMinutes'>>,
   ) => void;
   removeExercise: (id: string) => void;
   spendSavings: (amount: number, note: string) => { ok: boolean; message: string };
@@ -228,6 +234,24 @@ export const useAppStore = create<AppState>()(
           achievements: unlockAchievements(next as AppState),
         });
       },
+      updateFood: (id, patch) => {
+        const target = get().foodEntries.find((item) => item.id === id);
+        if (!target) return;
+        const foodEntries = get().foodEntries.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                name: patch.name !== undefined ? patch.name.trim() : item.name,
+                calories:
+                  patch.calories !== undefined
+                    ? Math.max(0, Math.round(patch.calories))
+                    : item.calories,
+              }
+            : item,
+        );
+        const computed = recomputeDate({ ...get(), foodEntries }, target.date);
+        set({ foodEntries, ...computed });
+      },
       removeFood: (id) => {
         const target = get().foodEntries.find((item) => item.id === id);
         const foodEntries = get().foodEntries.filter((item) => item.id !== id);
@@ -270,6 +294,37 @@ export const useAppStore = create<AppState>()(
           ...computed,
           achievements: unlockAchievements(next as AppState),
         });
+      },
+      updateExercise: (id, patch) => {
+        const profile = get().profile;
+        const target = get().exerciseEntries.find((item) => item.id === id);
+        if (!profile || !target) return;
+        const nextType = patch.type?.trim() || target.type;
+        const nextDuration = patch.durationMinutes ?? target.durationMinutes;
+        const option = ACTIVITY_OPTIONS.find((item) => item.name === nextType);
+        const rawEstimate = option
+          ? estimateActivityCalories(option.met, profile.weightKg, nextDuration)
+          : target.durationMinutes > 0
+            ? Math.round(target.caloriesCredit * (nextDuration / target.durationMinutes))
+            : target.caloriesCredit;
+        const othersRaw = get()
+          .exerciseEntries.filter((item) => item.date === target.date && item.id !== id)
+          .reduce((sum, item) => sum + item.caloriesCredit, 0);
+        const remaining =
+          capExerciseCredit(othersRaw + rawEstimate, profile.dailyGoal) - othersRaw;
+        const caloriesCredit = Math.max(0, Math.round(remaining));
+        const exerciseEntries = get().exerciseEntries.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                type: nextType,
+                durationMinutes: Math.max(1, Math.round(nextDuration)),
+                caloriesCredit,
+              }
+            : item,
+        );
+        const computed = recomputeDate({ ...get(), exerciseEntries }, target.date);
+        set({ exerciseEntries, ...computed });
       },
       removeExercise: (id) => {
         const target = get().exerciseEntries.find((item) => item.id === id);
