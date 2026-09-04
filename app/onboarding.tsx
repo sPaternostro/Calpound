@@ -8,6 +8,7 @@ import { AppText, HelpText, Title } from '@/components/ui/AppText';
 import { Button, Card, ChoiceChip } from '@/components/ui/Button';
 import { Callout, CalloutText } from '@/components/ui/Callout';
 import { Field } from '@/components/ui/Field';
+import { AppHeader } from '@/components/ui/AppHeader';
 import { Screen } from '@/components/ui/Screen';
 import { SummaryRow } from '@/components/ui/SummaryRow';
 import {
@@ -17,13 +18,33 @@ import {
 } from '@/lib/calculations';
 import { ACTIVITY_LEVEL_OPTIONS, GOAL_OPTIONS, SEX_OPTIONS } from '@/lib/copy';
 import { useAppStore } from '@/lib/store';
-import type { ActivityLevel, ActivityPreference, AppMode, GoalType, Sex } from '@/lib/types';
+import type {
+  ActivityLevel,
+  ActivityPreference,
+  AppMode,
+  GoalType,
+  Sex,
+  UnitSystem,
+} from '@/lib/types';
+import {
+  cmToFtIn,
+  formatHeightCm,
+  formatWeight,
+  ftInToCm,
+  isValidMetricBody,
+  lbToKg,
+  parseDecimal,
+} from '@/lib/units';
+import { usePalette } from '@/lib/usePalette';
 
 type Draft = {
   name: string;
   age: string;
-  weightKg: string;
+  weight: string;
   heightCm: string;
+  feet: string;
+  inches: string;
+  unitSystem: UnitSystem;
   sex: Sex;
   activityLevel: ActivityLevel;
   goalType: GoalType;
@@ -35,8 +56,11 @@ type Draft = {
 const INITIAL: Draft = {
   name: '',
   age: '30',
-  weightKg: '70',
+  weight: '70',
   heightCm: '170',
+  feet: '5',
+  inches: '7',
+  unitSystem: 'metric',
   sex: 'female',
   activityLevel: 'light',
   goalType: 'lose',
@@ -46,12 +70,44 @@ const INITIAL: Draft = {
 };
 
 function NumberedBullet({ n, children }: { n: number; children: string }) {
+  const theme = usePalette();
   return (
-    <View className="flex-row items-start rounded-2xl border border-line bg-paper px-4 py-3">
-      <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-forest">
-        <AppText className="text-xs font-semibold text-paper">{n}</AppText>
+    <View
+      className="flex-row items-start rounded-2xl border px-4 py-3"
+      style={{ borderColor: theme.hex.line, backgroundColor: theme.hex.card }}>
+      <View
+        className="mr-3 h-7 w-7 items-center justify-center rounded-full"
+        style={{ backgroundColor: theme.hex.primary }}>
+        <AppText className="text-xs" style={{ color: theme.hex.onPrimary }}>
+          {n}
+        </AppText>
       </View>
       <AppText className="flex-1 leading-5">{children}</AppText>
+    </View>
+  );
+}
+
+function FooterNav({
+  onBack,
+  onNext,
+  nextLabel,
+  nextDisabled,
+}: {
+  onBack?: () => void;
+  onNext: () => void;
+  nextLabel: string;
+  nextDisabled?: boolean;
+}) {
+  return (
+    <View className="flex-row gap-3">
+      {onBack ? (
+        <View className="flex-1">
+          <Button label="Atrás" variant="ghost" onPress={onBack} />
+        </View>
+      ) : null}
+      <View className="flex-1">
+        <Button label={nextLabel} onPress={onNext} disabled={nextDisabled} />
+      </View>
     </View>
   );
 }
@@ -62,31 +118,44 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(INITIAL);
 
-  const numbers = {
-    age: Number(draft.age),
-    weightKg: Number(draft.weightKg),
-    heightCm: Number(draft.heightCm),
-  };
-  const profileOk =
-    numbers.age >= 14 &&
-    numbers.age <= 90 &&
-    numbers.weightKg >= 30 &&
-    numbers.weightKg <= 250 &&
-    numbers.heightCm >= 120 &&
-    numbers.heightCm <= 230;
+  const weightKg =
+    draft.unitSystem === 'imperial'
+      ? lbToKg(parseDecimal(draft.weight) ?? 0)
+      : (parseDecimal(draft.weight) ?? 0);
+  const heightCm =
+    draft.unitSystem === 'imperial'
+      ? ftInToCm(parseDecimal(draft.feet) ?? 0, parseDecimal(draft.inches) ?? 0)
+      : (parseDecimal(draft.heightCm) ?? 0);
+  const age = parseDecimal(draft.age) ?? 0;
+  const profileOk = age >= 14 && age <= 90 && isValidMetricBody(weightKg, heightCm);
 
   const metrics = useMemo(() => {
     if (!profileOk) return null;
-    const tdee = calculateTdee(
-      numbers.weightKg,
-      numbers.heightCm,
-      numbers.age,
-      draft.sex,
-      draft.activityLevel,
-    );
+    const tdee = calculateTdee(weightKg, heightCm, age, draft.sex, draft.activityLevel);
     const range = calculateHealthyRange(tdee, draft.sex);
     return { tdee, ...range };
-  }, [profileOk, numbers.weightKg, numbers.heightCm, numbers.age, draft.sex, draft.activityLevel]);
+  }, [profileOk, weightKg, heightCm, age, draft.sex, draft.activityLevel]);
+
+  const setUnit = (unitSystem: UnitSystem) => {
+    if (unitSystem === draft.unitSystem) return;
+    const kg =
+      draft.unitSystem === 'imperial'
+        ? lbToKg(parseDecimal(draft.weight) ?? 70)
+        : (parseDecimal(draft.weight) ?? 70);
+    const cm =
+      draft.unitSystem === 'imperial'
+        ? ftInToCm(parseDecimal(draft.feet) ?? 5, parseDecimal(draft.inches) ?? 7)
+        : (parseDecimal(draft.heightCm) ?? 170);
+    const ftIn = cmToFtIn(cm);
+    setDraft((prev) => ({
+      ...prev,
+      unitSystem,
+      weight: formatWeight(kg, unitSystem),
+      heightCm: formatHeightCm(cm),
+      feet: String(ftIn.feet),
+      inches: String(ftIn.inches),
+    }));
+  };
 
   const goToGoal = () => {
     if (!metrics) return;
@@ -101,9 +170,9 @@ export default function OnboardingScreen() {
     if (!metrics) return;
     completeOnboarding({
       name: draft.name.trim() || undefined,
-      age: numbers.age,
-      weightKg: numbers.weightKg,
-      heightCm: numbers.heightCm,
+      age,
+      weightKg: Math.round(weightKg * 10) / 10,
+      heightCm: Math.round(heightCm),
       sex: draft.sex,
       activityLevel: draft.activityLevel,
       goalType: draft.goalType,
@@ -113,12 +182,38 @@ export default function OnboardingScreen() {
       dailyGoal: draft.dailyGoal,
       mode: draft.mode,
       activityPreference: draft.activityPreference,
+      unitSystem: draft.unitSystem,
     });
     router.replace('/(tabs)');
   };
 
+  const footer =
+    step === 0 ? (
+      <FooterNav onNext={() => setStep(1)} nextLabel="Empezar" />
+    ) : step === 1 ? (
+      <FooterNav
+        onBack={() => setStep(0)}
+        onNext={goToGoal}
+        nextLabel="Calcular"
+        nextDisabled={!profileOk}
+      />
+    ) : step === 2 ? (
+      <FooterNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel="Continuar" />
+    ) : step === 3 ? (
+      <FooterNav onBack={() => setStep(2)} onNext={() => setStep(4)} nextLabel="Continuar" />
+    ) : step === 4 ? (
+      <FooterNav onBack={() => setStep(3)} onNext={() => setStep(5)} nextLabel="Continuar" />
+    ) : (
+      <FooterNav
+        onBack={() => setStep(4)}
+        onNext={finish}
+        nextLabel="Crear mi presupuesto"
+        nextDisabled={!metrics}
+      />
+    );
+
   return (
-    <Screen>
+    <Screen header={<AppHeader />} footer={footer}>
       <OnboardingProgress current={step + 1} />
 
       {step === 0 && (
@@ -141,9 +236,6 @@ export default function OnboardingScreen() {
               saldo, y al siguiente arrancás de nuevo.
             </NumberedBullet>
           </View>
-          <View className="mt-8">
-            <Button label="Empezar" onPress={() => setStep(1)} />
-          </View>
         </View>
       )}
 
@@ -154,34 +246,68 @@ export default function OnboardingScreen() {
             Usamos Mifflin-St Jeor, una fórmula estándar, para estimar cuánta energía gastás en un
             día típico (TDEE).
           </AppText>
+          <AppText className="mb-2 text-sm">Sistema de unidades</AppText>
+          <View className="flex-row flex-wrap">
+            <ChoiceChip
+              label="Métrico (kg, cm)"
+              selected={draft.unitSystem === 'metric'}
+              onPress={() => setUnit('metric')}
+            />
+            <ChoiceChip
+              label="Imperial (lb, ft)"
+              selected={draft.unitSystem === 'imperial'}
+              onPress={() => setUnit('imperial')}
+            />
+          </View>
           <Field
             label="Nombre (opcional)"
             value={draft.name}
             onChangeText={(name) => setDraft((p) => ({ ...p, name }))}
-            help="Si lo cargás, Home te saluda por tu nombre. Podés dejarlo vacío."
+            help="¿Cómo te gustaría que te llamemos? Podés dejarlo vacío."
           />
           <Field
             label="Edad"
             keyboardType="number-pad"
             value={draft.age}
-            onChangeText={(age) => setDraft((p) => ({ ...p, age }))}
+            onChangeText={(next) => setDraft((p) => ({ ...p, age: next }))}
             help="La edad entra en la fórmula del gasto basal. No hace falta ser exacto al día."
           />
           <Field
-            label="Peso (kg)"
+            label={draft.unitSystem === 'imperial' ? 'Peso (lb)' : 'Peso (kg)'}
             keyboardType="decimal-pad"
-            value={draft.weightKg}
-            onChangeText={(weightKg) => setDraft((p) => ({ ...p, weightKg }))}
-            help="Un peso aproximado alcanza. Podés actualizarlo después en Configuración."
+            value={draft.weight}
+            onChangeText={(weight) => setDraft((p) => ({ ...p, weight }))}
+            help="Ejemplo: 70,50 o 70.50. Un aproximado alcanza; se actualiza en Ajustes."
           />
-          <Field
-            label="Altura (cm)"
-            keyboardType="number-pad"
-            value={draft.heightCm}
-            onChangeText={(heightCm) => setDraft((p) => ({ ...p, heightCm }))}
-            help="La altura también alimenta el cálculo de gasto energético."
-          />
-          <AppText className="mb-2 text-sm font-medium">Sexo (para la fórmula)</AppText>
+          {draft.unitSystem === 'imperial' ? (
+            <View className="flex-row gap-2">
+              <View className="flex-1">
+                <Field
+                  label="Altura (pies)"
+                  keyboardType="number-pad"
+                  value={draft.feet}
+                  onChangeText={(feet) => setDraft((p) => ({ ...p, feet }))}
+                />
+              </View>
+              <View className="flex-1">
+                <Field
+                  label="Pulgadas"
+                  keyboardType="decimal-pad"
+                  value={draft.inches}
+                  onChangeText={(inches) => setDraft((p) => ({ ...p, inches }))}
+                />
+              </View>
+            </View>
+          ) : (
+            <Field
+              label="Altura (cm)"
+              keyboardType="decimal-pad"
+              value={draft.heightCm}
+              onChangeText={(heightCm) => setDraft((p) => ({ ...p, heightCm }))}
+              help="La altura también alimenta el cálculo de gasto energético."
+            />
+          )}
+          <AppText className="mb-2 text-sm">Sexo (para la fórmula)</AppText>
           <View className="flex-row flex-wrap">
             {SEX_OPTIONS.map((option) => (
               <ChoiceChip
@@ -193,7 +319,7 @@ export default function OnboardingScreen() {
             ))}
           </View>
           <HelpText>{SEX_OPTIONS.find((o) => o.value === draft.sex)?.help ?? ''}</HelpText>
-          <AppText className="mb-2 mt-5 text-sm font-medium">Actividad habitual</AppText>
+          <AppText className="mb-2 mt-5 text-sm">Actividad habitual</AppText>
           <View className="flex-row flex-wrap">
             {ACTIVITY_LEVEL_OPTIONS.map((option) => (
               <ChoiceChip
@@ -207,14 +333,6 @@ export default function OnboardingScreen() {
           <HelpText>
             {ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === draft.activityLevel)?.help ?? ''}
           </HelpText>
-          <View className="mt-8 flex-row gap-3">
-            <View className="flex-1">
-              <Button label="Atrás" variant="ghost" onPress={() => setStep(0)} />
-            </View>
-            <View className="flex-1">
-              <Button label="Calcular" onPress={goToGoal} disabled={!profileOk} />
-            </View>
-          </View>
         </View>
       )}
 
@@ -223,11 +341,7 @@ export default function OnboardingScreen() {
           <Title>Tu rango saludable</Title>
           <Card className="mt-5 p-5">
             <SummaryRow label="Gasto estimado (TDEE)" value={`${metrics.tdee} kcal`} />
-            <SummaryRow
-              label="Rango seguro"
-              value={`${metrics.min} – ${metrics.max} kcal`}
-              last
-            />
+            <SummaryRow label="Rango seguro" value={`${metrics.min} – ${metrics.max} kcal`} last />
           </Card>
           <Callout className="mt-3">
             <CalloutText>
@@ -245,14 +359,6 @@ export default function OnboardingScreen() {
               dailyGoal={draft.dailyGoal}
               onChange={(next) => setDraft((p) => ({ ...p, ...next }))}
             />
-          </View>
-          <View className="mt-8 flex-row gap-3">
-            <View className="flex-1">
-              <Button label="Atrás" variant="ghost" onPress={() => setStep(1)} />
-            </View>
-            <View className="flex-1">
-              <Button label="Continuar" onPress={() => setStep(3)} />
-            </View>
           </View>
         </View>
       )}
@@ -281,14 +387,6 @@ export default function OnboardingScreen() {
               ? 'Vamos a sugerirte cosas como caminar, yoga, bici suave o natación tranquila.'
               : 'Vamos a sugerirte cosas como correr, HIIT, fuerza o series de natación.'}
           </HelpText>
-          <View className="mt-8 flex-row gap-3">
-            <View className="flex-1">
-              <Button label="Atrás" variant="ghost" onPress={() => setStep(2)} />
-            </View>
-            <View className="flex-1">
-              <Button label="Continuar" onPress={() => setStep(4)} />
-            </View>
-          </View>
         </View>
       )}
 
@@ -296,44 +394,54 @@ export default function OnboardingScreen() {
         <View>
           <Title>¿Cómo querés usar Calpound?</Title>
           <AppText tone="muted" className="mt-2 mb-5">
-            Los dos modos respetan las mismas reglas de presupuesto. Solo cambia el énfasis visual.
+            Las reglas del presupuesto son las mismas. Cambia el ritmo de la app.
           </AppText>
           <View className="flex-row flex-wrap">
             <ChoiceChip
-              label="Normal"
+              label="Chill"
               selected={draft.mode === 'normal'}
               onPress={() => setDraft((p) => ({ ...p, mode: 'normal' }))}
             />
             <ChoiceChip
-              label="Tryhard"
+              label="Lock in"
               selected={draft.mode === 'tryhard'}
               onPress={() => setDraft((p) => ({ ...p, mode: 'tryhard' }))}
             />
           </View>
           <HelpText>
             {draft.mode === 'normal'
-              ? 'Dashboard simple: ves el día, el banco y la racha sin ruido extra.'
-              : 'Más énfasis en la racha actual y en compararla con tu mejor marca histórica.'}
+              ? 'Chill es la versión base: limpia, simple y sin ruido extra.'
+              : 'Lock in es para quienes quieren tomárselo en serio: más foco en la misión del día y en la racha.'}
           </HelpText>
-          <View className="mt-8 flex-row gap-3">
-            <View className="flex-1">
-              <Button label="Atrás" variant="ghost" onPress={() => setStep(3)} />
-            </View>
-            <View className="flex-1">
-              <Button label="Continuar" onPress={() => setStep(5)} />
-            </View>
-          </View>
         </View>
       )}
 
       {step === 5 && metrics && (
         <View>
-          <Title>Confirmá tu presupuesto</Title>
+          <Title>Confirmá tus datos</Title>
           <Card className="mt-5 p-5">
-            <AppText className="mb-1 text-lg font-semibold">Esto es lo que vas a crear</AppText>
-            {draft.name.trim() ? (
-              <SummaryRow label="Nombre" value={draft.name.trim()} />
-            ) : null}
+            <AppText className="mb-1 text-lg">Esto es lo que vas a crear</AppText>
+            {draft.name.trim() ? <SummaryRow label="Nombre" value={draft.name.trim()} /> : null}
+            <SummaryRow
+              label="Unidades"
+              value={draft.unitSystem === 'imperial' ? 'Imperial' : 'Métrico'}
+            />
+            <SummaryRow
+              label="Peso"
+              value={
+                draft.unitSystem === 'imperial'
+                  ? `${draft.weight} lb`
+                  : `${draft.weight} kg`
+              }
+            />
+            <SummaryRow
+              label="Altura"
+              value={
+                draft.unitSystem === 'imperial'
+                  ? `${draft.feet}′ ${draft.inches}″`
+                  : `${draft.heightCm} cm`
+              }
+            />
             <SummaryRow label="Gasto estimado (TDEE)" value={`${metrics.tdee} kcal`} />
             <SummaryRow label="Rango seguro" value={`${metrics.min} – ${metrics.max} kcal`} />
             <SummaryRow
@@ -345,11 +453,7 @@ export default function OnboardingScreen() {
               label="Movimiento"
               value={draft.activityPreference === 'low_impact' ? 'Bajo impacto' : 'Más intensa'}
             />
-            <SummaryRow
-              label="Modo"
-              value={draft.mode === 'normal' ? 'Normal' : 'Tryhard'}
-              last
-            />
+            <SummaryRow label="Modo" value={draft.mode === 'normal' ? 'Chill' : 'Lock in'} last />
           </Card>
           <Callout className="mt-4">
             <CalloutText>
@@ -358,14 +462,6 @@ export default function OnboardingScreen() {
               embarazada o tenés dudas, consultá con alguien formado.
             </CalloutText>
           </Callout>
-          <View className="mt-8 flex-row gap-3">
-            <View className="flex-1">
-              <Button label="Atrás" variant="ghost" onPress={() => setStep(4)} />
-            </View>
-            <View className="flex-1">
-              <Button label="Crear mi presupuesto" onPress={finish} />
-            </View>
-          </View>
         </View>
       )}
     </Screen>

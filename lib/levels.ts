@@ -94,3 +94,45 @@ export function nearestAchievement(params: {
 
   return candidates[0] ?? null;
 }
+
+export function achievementRoadmap(
+  item: Achievement,
+  dailyLogs: Record<string, DailyLog>,
+  savings: SavingsBalance,
+): string {
+  if (item.unlockedAt) {
+    const date = new Date(item.unlockedAt).toLocaleDateString('es-AR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    return `Logrado · ${date}`;
+  }
+  const streak = currentStreak(dailyLogs);
+  const historic = bestStreak(dailyLogs);
+  const validCount = Object.values(dailyLogs).filter((log) => log.isValidDay).length;
+  const weekValid = validDaysInWeek(dailyLogs, todayKey());
+  const daysLeft = (current: number, goal: number) => {
+    const left = Math.max(0, goal - current);
+    if (left === 1) return 'Falta 1 día';
+    return `Faltan ${left} días`;
+  };
+
+  if (item.id === 'first_valid') return daysLeft(validCount, 1);
+  if (item.id === 'streak_3') return daysLeft(streak, 3);
+  if (item.id === 'streak_7') return daysLeft(streak, 7);
+  if (item.id === 'streak_14') return daysLeft(streak, 14);
+  if (item.id === 'streak_30') return daysLeft(streak, 30);
+  if (item.id === 'best_streak_7') return daysLeft(historic, 7);
+  if (item.id === 'week_5') return daysLeft(weekValid, 5);
+  if (item.id === 'saved_2k') {
+    const left = Math.max(0, 2000 - savings.totalSaved);
+    return left === 0 ? 'Casi' : `Faltan ${Math.round(left)} kcal`;
+  }
+  if (item.id === 'saved_10k') {
+    const left = Math.max(0, 10000 - savings.totalSaved);
+    return left === 0 ? 'Casi' : `Faltan ${Math.round(left)} kcal`;
+  }
+  if (item.id === 'first_spend') return 'Todavía no';
+  return 'En camino';
+}

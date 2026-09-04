@@ -9,6 +9,8 @@ import { Button, Card, ChoiceChip } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Screen } from '@/components/ui/Screen';
 import { PORTION_HINTS } from '@/lib/copy';
+import { useEntryDate } from '@/lib/entryDate';
+import { formatDayLabel, todayKey } from '@/lib/dates';
 import {
   caloriesHint,
   describeSearchFailure,
@@ -19,14 +21,21 @@ import {
 } from '@/lib/openFoodFacts';
 import { useAppStore } from '@/lib/store';
 import type { CatalogFood, FoodSource } from '@/lib/types';
+import { usePalette } from '@/lib/usePalette';
 
 type TabKey = 'search' | 'scan' | 'manual' | 'recents';
 
 export default function FoodScreen() {
   const router = useRouter();
+  const theme = usePalette();
+  const entryDate = useEntryDate();
   const addFood = useAppStore((s) => s.addFood);
   const catalog = useAppStore((s) => s.catalog);
   const toggleFavorite = useAppStore((s) => s.toggleFavorite);
+  const toggleGuiltFree = useAppStore((s) => s.toggleGuiltFree);
+  const guiltFreeCount = useAppStore(
+    (s) => (s.profile?.guiltFreeFoods ?? []).filter((item) => item.name.trim()).length,
+  );
   const [tab, setTab] = useState<TabKey>('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<OffProduct[]>([]);
@@ -41,6 +50,7 @@ export default function FoodScreen() {
   const recentsList = useMemo(() => {
     return [...catalog].sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      if (!!a.isGuiltFree !== !!b.isGuiltFree) return a.isGuiltFree ? -1 : 1;
       return b.lastUsedAt.localeCompare(a.lastUsedAt);
     });
   }, [catalog]);
@@ -84,7 +94,7 @@ export default function FoodScreen() {
     extra?: { barcode?: string; servingLabel?: string },
   ) => {
     if (!name.trim() || calories <= 0) return;
-    addFood({ name, calories, source, ...extra });
+    addFood({ name, calories, source, date: entryDate, ...extra });
     router.back();
   };
 
@@ -94,6 +104,9 @@ export default function FoodScreen() {
 
   return (
     <Screen safeTop={false}>
+      {entryDate !== todayKey() ? (
+        <AppText className="mb-2 font-semibold">Para el {formatDayLabel(entryDate)}</AppText>
+      ) : null}
       <HelpText>
         Buscá por nombre, escaneá el envase, anotá las calorías a mano o reutilizá algo reciente.
       </HelpText>
@@ -133,7 +146,8 @@ export default function FoodScreen() {
                     servingLabel: product.servingSize,
                   });
                 }}
-                className="mb-2 rounded-2xl border border-line bg-paper px-4 py-3">
+                className="mb-2 rounded-2xl border px-4 py-3"
+                style={{ backgroundColor: theme.hex.card, borderColor: theme.hex.line }}>
                 <AppText className="font-medium">{product.name}</AppText>
                 {product.brands ? (
                   <AppText tone="muted" className="text-xs">
@@ -227,8 +241,7 @@ export default function FoodScreen() {
       {tab === 'recents' && (
         <View className="mt-4">
           <HelpText>
-            Favoritos primero, después lo último que usaste. Tocá para sumarlo al día; la estrella lo
-            deja fijo arriba.
+            Tocá para sumar al día. Estrella = favorito. Hoja = sin culpa (hasta 3).
           </HelpText>
           {recentsList.length === 0 ? (
             <AppText tone="muted" className="mt-4">
@@ -241,8 +254,14 @@ export default function FoodScreen() {
                 name={item.name}
                 calories={item.calories}
                 favorite={item.isFavorite}
+                guiltFree={!!item.isGuiltFree}
+                canMarkGuiltFree={guiltFreeCount < 3 || !!item.isGuiltFree}
+                cardColor={theme.hex.card}
+                lineColor={theme.hex.line}
+                ink={theme.hex.accent}
                 onPress={() => saveFromCatalog(item)}
                 onStar={() => toggleFavorite(item.name)}
+                onLeaf={() => toggleGuiltFree(item.name)}
               />
             ))
           )}
@@ -256,22 +275,43 @@ function QuickRow({
   name,
   calories,
   favorite,
+  guiltFree,
+  canMarkGuiltFree,
+  cardColor,
+  lineColor,
+  ink,
   onPress,
   onStar,
+  onLeaf,
 }: {
   name: string;
   calories: number;
   favorite: boolean;
+  guiltFree: boolean;
+  canMarkGuiltFree: boolean;
+  cardColor: string;
+  lineColor: string;
+  ink: string;
   onPress: () => void;
   onStar: () => void;
+  onLeaf: () => void;
 }) {
   return (
-    <View className="mb-2 flex-row items-center rounded-2xl border border-line bg-paper">
+    <View
+      className="mb-2 flex-row items-center rounded-2xl border"
+      style={{ backgroundColor: cardColor, borderColor: lineColor }}>
       <Pressable onPress={onPress} className="flex-1 px-4 py-3">
         <AppText className="font-medium">{name}</AppText>
         <AppText tone="muted" className="text-xs">
-          {calories} kcal
+          {calories} kcal{guiltFree ? ' · sin culpa' : ''}
         </AppText>
+      </Pressable>
+      <Pressable onPress={onLeaf} disabled={!canMarkGuiltFree} className="px-2 py-3">
+        <Ionicons
+          name={guiltFree ? 'leaf' : 'leaf-outline'}
+          size={20}
+          color={canMarkGuiltFree ? ink : '#C5BFB6'}
+        />
       </Pressable>
       <Pressable onPress={onStar} className="px-4 py-3">
         <Ionicons name={favorite ? 'star' : 'star-outline'} size={20} color="#C17F4A" />

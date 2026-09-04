@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { AppHeader } from '@/components/ui/AppHeader';
 import { BudgetBar } from '@/components/ui/BudgetBar';
-import { AppText, HelpText, Title } from '@/components/ui/AppText';
+import { AppText, Title } from '@/components/ui/AppText';
 import { Button, Card } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
+import { MissionCard } from '@/components/ui/MissionCard';
 import { Screen } from '@/components/ui/Screen';
 import { SATIETY_TIPS } from '@/lib/copy';
-import { formatKcal } from '@/lib/dates';
+import { formatKcal, todayKey } from '@/lib/dates';
+import { isMissionComplete, missionForDay } from '@/lib/missions';
 import {
   selectTodayExercise,
   selectTodayFood,
@@ -16,6 +20,7 @@ import {
   useAppStore,
 } from '@/lib/store';
 import { bestStreak, currentStreak } from '@/lib/streaks';
+import { usePalette } from '@/lib/usePalette';
 import { useShallow } from 'zustand/react/shallow';
 
 type MenuTarget =
@@ -46,13 +51,16 @@ export default function HomeScreen() {
   const [tip] = useState(
     () => SATIETY_TIPS[Math.floor(Math.random() * SATIETY_TIPS.length)] ?? SATIETY_TIPS[0],
   );
+  const theme = usePalette();
 
   if (!profile || !log) return null;
 
   const streak = currentStreak(logs);
   const historic = bestStreak(logs);
-  const tryhard = profile.mode === 'tryhard';
-  const greeting = profile.name?.trim() ? `Hoy, ${profile.name.trim()}` : 'Hoy';
+  const lockin = profile.mode === 'tryhard';
+  const greeting = profile.name?.trim() ? `Hola, ${profile.name.trim()}` : 'Hoy';
+  const mission = missionForDay(todayKey(), profile.goalType);
+  const missionDone = isMissionComplete(mission, foods, exercises, log);
   const remaining =
     profile.goalType === 'gain'
       ? Math.max(0, profile.dailyGoal - log.totalConsumed)
@@ -91,34 +99,33 @@ export default function HomeScreen() {
   };
 
   return (
-    <Screen>
-      <AppText tone="bronze" className="text-xs font-semibold uppercase tracking-[2px]">
-        Calpound
-      </AppText>
-      <View className="mt-1 flex-row flex-wrap items-center">
-        <Title className="mr-2">{greeting}</Title>
-        {tryhard ? (
-          <View className="rounded-full bg-bronze px-3 py-1">
-            <AppText tone="paper" className="text-xs font-semibold">
-              Modo Foco
-            </AppText>
-          </View>
-        ) : null}
-      </View>
-      <HelpText>
-        {profile.goalType === 'gain'
-          ? 'Tu presupuesto de hoy es un piso: la idea es llegar al objetivo sin pasar el tope seguro.'
-          : 'Tu presupuesto de hoy es un techo: lo que no uses, si el día queda en rango, se ahorra.'}
-      </HelpText>
+    <Screen header={<AppHeader />}>
+      <Title className="text-[28px]">
+        {greeting} {lockin ? '🔥' : '😊'}
+      </Title>
 
-      <Card className="mt-5 border-forest bg-sage p-5">
-        <AppText tone="muted" className="text-sm">
+      <View className="mt-4">
+        <MissionCard
+          mission={mission}
+          done={missionDone}
+          onPress={() => router.push(mission.href)}
+        />
+      </View>
+
+      {lockin ? (
+        <AppText tone="bronze" className="mt-2 text-sm font-medium">
+          Racha {streak} días · mejor {historic}
+        </AppText>
+      ) : null}
+
+      <Card className="mt-4" style={{ padding: 22 }}>
+        <AppText tone="muted" className="mb-3 text-sm">
           Usado hoy
         </AppText>
-        <AppText className="text-5xl font-semibold tracking-tight">
+        <AppText className="text-4xl font-semibold tracking-tight" style={{ lineHeight: 48 }}>
           {formatKcal(log.totalConsumed)}
         </AppText>
-        <View className="mt-3 flex-row justify-between">
+        <View className="mt-5 flex-row justify-between">
           <View>
             <AppText tone="muted" className="text-xs">
               {profile.goalType === 'gain' ? 'Falta para el piso' : 'Queda'}
@@ -134,7 +141,7 @@ export default function HomeScreen() {
             </AppText>
           </View>
         </View>
-        <View className="mt-4">
+        <View className="mt-5">
           <BudgetBar
             consumed={log.totalConsumed}
             dailyGoal={profile.dailyGoal}
@@ -146,34 +153,105 @@ export default function HomeScreen() {
         </View>
       </Card>
 
-      <View className="mt-3 rounded-2xl bg-paper px-4 py-3 border border-line">
-        <AppText tone="muted" className="text-xs uppercase tracking-wide">
-          Tip
-        </AppText>
-        <AppText className="mt-1 text-sm leading-5">{tip}</AppText>
-      </View>
+      {!lockin ? (
+        <View className={`mt-3 rounded-2xl border px-4 py-3 ${theme.card}`}>
+          <AppText tone="muted" className="text-xs uppercase tracking-wide">
+            Tip
+          </AppText>
+          <AppText className="mt-1 text-sm leading-5">{tip}</AppText>
+        </View>
+      ) : null}
 
-      <View className={`mt-4 flex-row gap-3 ${tryhard ? 'flex-col' : ''}`}>
-        <Card className="flex-1">
+      {!lockin ? (
+        <Pressable onPress={() => router.push('/(tabs)/achievements')} className="mt-4">
+          <Card>
+            <AppText tone="muted" className="text-sm">
+              Racha
+            </AppText>
+            <AppText className="text-2xl font-semibold">{streak} días</AppText>
+          </Card>
+        </Pressable>
+      ) : null}
+
+      <Card className="mt-5">
+        <View className="mb-3 flex-row items-center justify-between">
+          <AppText className="font-semibold">Comidas</AppText>
+          <Pressable onPress={() => router.push('/food')} className={`rounded-full px-3 py-1 ${lockin ? 'bg-ember' : 'bg-sage'}`}>
+            <AppText tone="forest" className="text-xs font-semibold">
+              + Sumar
+            </AppText>
+          </Pressable>
+        </View>
+        {foods.length === 0 ? (
+          <Pressable
+            onPress={() => router.push('/food')}
+            className={`items-center rounded-2xl border border-dashed py-6 ${lockin ? 'border-emberLine' : 'border-line'}`}>
+            <Ionicons name="restaurant-outline" size={28} color={theme.hex.accent} />
+            <AppText className="mt-2 font-medium">Todavía vacío</AppText>
+            <AppText tone="muted" className="mt-1 text-xs">
+              Buscá, escaneá o anotá a mano
+            </AppText>
+          </Pressable>
+        ) : (
+          foods.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => setMenu({ kind: 'food', id: item.id, label: item.name })}
+              className={`mb-2 flex-row items-center justify-between rounded-2xl px-4 py-3 ${theme.inset}`}>
+              <AppText className="flex-1 pr-3 font-medium">{item.name}</AppText>
+              <AppText>{item.calories} kcal</AppText>
+            </Pressable>
+          ))
+        )}
+      </Card>
+
+      <Card className="mt-3">
+        <View className="mb-3 flex-row items-center justify-between">
+          <AppText className="font-semibold">Movimiento</AppText>
+          <Pressable onPress={() => router.push('/activity')} className={`rounded-full px-3 py-1 ${lockin ? 'bg-ember' : 'bg-sage'}`}>
+            <AppText tone="forest" className="text-xs font-semibold">
+              + Sumar
+            </AppText>
+          </Pressable>
+        </View>
+        {exercises.length === 0 ? (
+          <Pressable
+            onPress={() => router.push('/activity')}
+            className={`items-center rounded-2xl border border-dashed py-6 ${lockin ? 'border-emberLine' : 'border-line'}`}>
+            <Ionicons name="walk-outline" size={28} color={theme.hex.accent} />
+            <AppText className="mt-2 font-medium">Sin actividad</AppText>
+            <AppText tone="muted" className="mt-1 text-xs">
+              Suma crédito al presupuesto de hoy
+            </AppText>
+          </Pressable>
+        ) : (
+          exercises.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => setMenu({ kind: 'exercise', id: item.id, label: item.type })}
+              className={`mb-2 flex-row items-center justify-between rounded-2xl px-4 py-3 ${theme.inset}`}>
+              <View className="flex-1 pr-3">
+                <AppText className="font-medium">{item.type}</AppText>
+                <AppText tone="muted" className="text-xs">
+                  {item.durationMinutes} min
+                </AppText>
+              </View>
+              <AppText>+{item.caloriesCredit} kcal</AppText>
+            </Pressable>
+          ))
+        )}
+      </Card>
+
+      <Pressable onPress={() => router.push('/(tabs)/bank')} className="mt-5">
+        <Card>
           <AppText tone="muted" className="text-sm">
             Banco
           </AppText>
-          <AppText className="text-2xl font-semibold text-forest">
+          <AppText className="text-2xl font-semibold" tone="forest">
             {formatKcal(savings.totalSaved)}
           </AppText>
         </Card>
-        <Card className="flex-1">
-          <AppText tone="muted" className="text-sm">
-            Racha
-          </AppText>
-          <AppText className="text-2xl font-semibold">{streak} días</AppText>
-          {tryhard ? (
-            <AppText tone="bronze" className="mt-1 text-sm font-medium">
-              Mejor histórica: {historic} días
-            </AppText>
-          ) : null}
-        </Card>
-      </View>
+      </Pressable>
 
       <View className="mt-5 gap-3">
         <Button label="Registrar comida" onPress={() => router.push('/food')} />
@@ -182,61 +260,11 @@ export default function HomeScreen() {
           variant="secondary"
           onPress={() => router.push('/activity')}
         />
-        <HelpText>
-          Registrar movimiento suma crédito a tu presupuesto de hoy. Está siempre a mano: no es una
-          sugerencia para “compensar” una comida.
-        </HelpText>
       </View>
-
-      <AppText className="mb-2 mt-6 font-semibold">Comidas de hoy</AppText>
-      {foods.length === 0 ? (
-        <AppText tone="muted">Todavía no cargaste nada. Podés buscar, escanear o anotar a mano.</AppText>
-      ) : (
-        foods.map((item) => (
-          <Pressable
-            key={item.id}
-            onPress={() => setMenu({ kind: 'food', id: item.id, label: item.name })}
-            className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
-            <View className="flex-1 pr-3">
-              <AppText className="font-medium">{item.name}</AppText>
-              <AppText tone="muted" className="text-xs">
-                {item.source === 'manual' ? 'Carga manual' : item.source === 'barcode' ? 'Código' : 'Búsqueda'}
-              </AppText>
-            </View>
-            <AppText>{item.calories} kcal</AppText>
-          </Pressable>
-        ))
-      )}
-
-      <AppText className="mb-2 mt-6 font-semibold">Movimiento de hoy</AppText>
-      {exercises.length === 0 ? (
-        <AppText tone="muted">Sin actividad registrada. Cuando quieras, sumala.</AppText>
-      ) : (
-        exercises.map((item) => (
-          <Pressable
-            key={item.id}
-            onPress={() => setMenu({ kind: 'exercise', id: item.id, label: item.type })}
-            className="mb-2 flex-row items-center justify-between rounded-2xl bg-paper px-4 py-3 border border-line">
-            <View>
-              <AppText className="font-medium">{item.type}</AppText>
-              <AppText tone="muted" className="text-xs">
-                {item.durationMinutes} min
-              </AppText>
-            </View>
-            <AppText>+{item.caloriesCredit} kcal</AppText>
-          </Pressable>
-        ))
-      )}
-      <HelpText>Tocá una entrada para editarla o quitarla.</HelpText>
-      <Link href="/(tabs)/bank" className="mt-4">
-        <AppText tone="forest" className="font-medium">
-          Ir al banco →
-        </AppText>
-      </Link>
 
       <Modal visible={menu !== null} transparent animationType="fade" onRequestClose={() => setMenu(null)}>
         <Pressable className="flex-1 items-center justify-center bg-black/40 px-6" onPress={() => setMenu(null)}>
-          <Pressable className="w-full rounded-3xl border border-line bg-cream p-5" onPress={() => undefined}>
+          <Pressable className={`w-full rounded-3xl border p-5 ${theme.card}`} onPress={() => undefined}>
             <AppText className="mb-1 text-lg font-semibold">{menu?.label}</AppText>
             <AppText tone="muted" className="mb-4 text-sm">
               ¿Qué querés hacer?
@@ -277,13 +305,12 @@ export default function HomeScreen() {
         <Pressable
           className="flex-1 items-center justify-center bg-black/40 px-6"
           onPress={() => setEditingFoodId(null)}>
-          <Pressable className="w-full rounded-3xl border border-line bg-cream p-5" onPress={() => undefined}>
+          <Pressable className={`w-full rounded-3xl border p-5 ${theme.card}`} onPress={() => undefined}>
             <AppText className="mb-3 text-lg font-semibold">Editar comida</AppText>
             <Field
               label="Nombre"
               value={editName}
               onChangeText={setEditName}
-              help="Cambia el nombre si querés reconocerlo mejor la próxima vez."
             />
             <Field
               label="Calorías"
@@ -293,7 +320,6 @@ export default function HomeScreen() {
                 setEditCalories(value);
                 setFoodError(null);
               }}
-              help="Ajustá el número si la porción no era exactamente esa."
             />
             {foodError ? (
               <AppText tone="bronze" className="mb-3 text-sm">
@@ -332,14 +358,9 @@ export default function HomeScreen() {
         <Pressable
           className="flex-1 items-center justify-center bg-black/40 px-6"
           onPress={() => setEditingExerciseId(null)}>
-          <Pressable className="w-full rounded-3xl border border-line bg-cream p-5" onPress={() => undefined}>
+          <Pressable className={`w-full rounded-3xl border p-5 ${theme.card}`} onPress={() => undefined}>
             <AppText className="mb-3 text-lg font-semibold">Editar actividad</AppText>
-            <Field
-              label="Tipo"
-              value={editType}
-              onChangeText={setEditType}
-              help="El nombre de la actividad. Si coincide con una sugerida, el crédito se recalcula."
-            />
+            <Field label="Tipo" value={editType} onChangeText={setEditType} />
             <Field
               label="Duración (min)"
               keyboardType="number-pad"
@@ -348,7 +369,6 @@ export default function HomeScreen() {
                 setEditMinutes(value);
                 setExerciseError(null);
               }}
-              help="Al guardar, el crédito del día se vuelve a calcular y se respeta el tope del 30%."
             />
             {exerciseError ? (
               <AppText tone="bronze" className="mb-3 text-sm">

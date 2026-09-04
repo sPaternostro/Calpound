@@ -3,6 +3,7 @@ export type Sex = 'male' | 'female' | 'other';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active';
 export type AppMode = 'normal' | 'tryhard';
 export type ActivityPreference = 'low_impact' | 'intense';
+export type UnitSystem = 'metric' | 'imperial';
 export type FoodSource = 'search' | 'barcode' | 'manual';
 export type MovementType = 'earned' | 'spent';
 export type AchievementType = 'streak' | 'milestone' | 'consistency';
@@ -26,6 +27,7 @@ export interface UserProfile {
   dailyGoal: number;
   mode: AppMode;
   activityPreference: ActivityPreference;
+  unitSystem?: UnitSystem;
   guiltFreeFoods?: GuiltFreeFood[];
 }
 
@@ -86,4 +88,5 @@ export interface CatalogFood {
   servingLabel?: string;
   lastUsedAt: string;
   isFavorite: boolean;
+  isGuiltFree?: boolean;
 }

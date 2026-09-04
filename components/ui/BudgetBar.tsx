@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import type { GoalType } from '@/lib/types';
+import { usePalette } from '@/lib/usePalette';
 
 import { AppText } from './AppText';
 
@@ -19,12 +20,10 @@ export function BudgetBar({
   exerciseCredit: number;
   goalType: GoalType;
 }) {
-  const ceiling = goalType === 'gain' ? healthyRangeMax : dailyGoal + exerciseCredit;
-  const floor = goalType === 'gain' ? dailyGoal : healthyRangeMin;
-  const span = Math.max(1, ceiling);
-  const usedPct = Math.min(100, (consumed / span) * 100);
-  const goalPct = Math.min(100, (dailyGoal / span) * 100);
-  const floorPct = Math.min(100, (floor / span) * 100);
+  const theme = usePalette();
+  const ceiling = goalType === 'gain' ? healthyRangeMax : Math.max(dailyGoal + exerciseCredit, 1);
+  const usedPct = Math.min(100, (consumed / ceiling) * 100);
+  const remainingPct = Math.max(0, 100 - usedPct);
 
   const inRange =
     goalType === 'gain'
@@ -33,20 +32,25 @@ export function BudgetBar({
 
   return (
     <View>
-      <View className="h-3 overflow-hidden rounded-full bg-sage">
+      <View
+        className="h-3.5 overflow-hidden rounded-full"
+        style={{
+          backgroundColor: theme.lockin ? '#3A2418' : '#E7E1D6',
+          borderWidth: 1,
+          borderColor: theme.hex.line,
+        }}>
         <View
-          className={`h-full rounded-full ${inRange ? 'bg-forest' : 'bg-bronze'}`}
-          style={{ width: `${usedPct}%` }}
+          className="h-full rounded-full"
+          style={{
+            width: `${usedPct}%`,
+            backgroundColor: inRange ? theme.hex.accent : theme.hex.flame,
+          }}
         />
       </View>
-      <View className="relative mt-1 h-4">
-        <View className="absolute top-0 h-3 w-0.5 bg-muted" style={{ left: `${floorPct}%` }} />
-        <View className="absolute top-0 h-3 w-0.5 bg-forest" style={{ left: `${goalPct}%` }} />
-      </View>
-      <AppText tone="muted" className="text-xs">
+      <AppText tone="muted" className="mt-2 text-xs">
         {goalType === 'gain'
-          ? `Piso del día ${Math.round(dailyGoal)} · tope seguro ${Math.round(healthyRangeMax)}`
-          : `Piso seguro ${Math.round(healthyRangeMin)} · presupuesto ${Math.round(dailyGoal)}${exerciseCredit ? ` + ${Math.round(exerciseCredit)} de movimiento` : ''}`}
+          ? `Piso ${Math.round(dailyGoal)} · tope ${Math.round(healthyRangeMax)}`
+          : `Usado ${Math.round(usedPct)}% · queda ${Math.round(remainingPct)}% del presupuesto`}
       </AppText>
     </View>
   );

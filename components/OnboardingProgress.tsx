@@ -2,17 +2,16 @@ import { Fragment } from 'react';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { usePalette } from '@/lib/usePalette';
 
 const TOTAL_STEPS = 6;
 
 export function OnboardingProgress({ current }: { current: number }) {
+  const theme = usePalette();
   return (
-    <View className="mb-6 overflow-hidden rounded-3xl border border-line bg-paper px-4 py-5">
-      <AppText
-        tone="muted"
-        className="mb-4 text-center text-[11px] font-semibold uppercase tracking-[2px]">
-        Calpound
-      </AppText>
+    <View
+      className="mb-4 overflow-hidden rounded-3xl border px-4 py-4"
+      style={{ borderColor: theme.hex.line, backgroundColor: theme.hex.card }}>
       <View className="flex-row items-center overflow-hidden">
         {Array.from({ length: TOTAL_STEPS }, (_, index) => {
           const n = index + 1;
@@ -21,18 +20,32 @@ export function OnboardingProgress({ current }: { current: number }) {
           return (
             <Fragment key={n}>
               <View
-                className={`h-7 w-7 items-center justify-center rounded-full ${
-                  active ? 'bg-forest' : done ? 'bg-sage' : 'border border-line bg-cream'
-                }`}
-                style={{ flexShrink: 0 }}>
-                <AppText className={`text-xs font-semibold ${active ? 'text-paper' : 'text-ink'}`}>
+                className="h-7 w-7 items-center justify-center rounded-full"
+                style={{
+                  flexShrink: 0,
+                  backgroundColor: active
+                    ? theme.hex.primary
+                    : done
+                      ? theme.hex.secondary
+                      : theme.hex.screen,
+                  borderWidth: active || done ? 0 : 1,
+                  borderColor: theme.hex.line,
+                }}>
+                <AppText
+                  className="text-xs"
+                  style={{ color: active ? theme.hex.onPrimary : theme.hex.ink }}>
                   {n}
                 </AppText>
               </View>
               {n < TOTAL_STEPS ? (
                 <View
-                  className={`mx-1 h-0.5 ${n < current ? 'bg-forest' : 'bg-line'}`}
-                  style={{ flexGrow: 1, flexShrink: 1, minWidth: 4 }}
+                  className="mx-1 h-0.5"
+                  style={{
+                    flexGrow: 1,
+                    flexShrink: 1,
+                    minWidth: 4,
+                    backgroundColor: n < current ? theme.hex.primary : theme.hex.line,
+                  }}
                 />
               ) : null}
             </Fragment>

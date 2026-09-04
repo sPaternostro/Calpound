@@ -11,6 +11,7 @@ import {
   suggestedDailyGoal,
 } from '@/lib/calculations';
 import type { GoalType } from '@/lib/types';
+import { usePalette } from '@/lib/usePalette';
 
 const STEP_KCAL = 50;
 
@@ -57,6 +58,7 @@ export function GoalEditor({
   const progressPct = Math.min(100, Math.max(0, ((localGoal - bounds.min) / span) * 100));
   const atMin = localGoal <= bounds.min;
   const atMax = localGoal >= bounds.max;
+  const theme = usePalette();
 
   return (
     <View>
@@ -80,14 +82,14 @@ export function GoalEditor({
         <Pressable
           onPress={() => applyDelta(-STEP_KCAL)}
           disabled={atMin}
-          className={`min-w-[72px] items-center justify-center rounded-2xl border border-line bg-paper px-3 py-3 ${atMin ? 'opacity-40' : 'active:opacity-80'}`}>
+          className={`min-w-[72px] items-center justify-center rounded-2xl border px-3 py-3 ${theme.card} ${atMin ? 'opacity-40' : 'active:opacity-80'}`}>
           <AppText className="text-sm font-semibold">−50</AppText>
         </Pressable>
-        <AppText className="text-2xl font-semibold text-forest">{localGoal} kcal</AppText>
+        <AppText className={`text-2xl font-semibold ${theme.accent}`}>{localGoal} kcal</AppText>
         <Pressable
           onPress={() => applyDelta(STEP_KCAL)}
           disabled={atMax}
-          className={`min-w-[72px] items-center justify-center rounded-2xl border border-line bg-paper px-3 py-3 ${atMax ? 'opacity-40' : 'active:opacity-80'}`}>
+          className={`min-w-[72px] items-center justify-center rounded-2xl border px-3 py-3 ${theme.card} ${atMax ? 'opacity-40' : 'active:opacity-80'}`}>
           <AppText className="text-sm font-semibold">+50</AppText>
         </Pressable>
       </View>

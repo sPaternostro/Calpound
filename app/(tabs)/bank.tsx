@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { AppText, HelpText, Title } from '@/components/ui/AppText';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { AppText, HelpText } from '@/components/ui/AppText';
 import { Button, Card } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Screen } from '@/components/ui/Screen';
@@ -32,18 +33,16 @@ export default function BankScreen() {
   };
 
   return (
-    <Screen>
-      <Title>Banco</Title>
+    <Screen header={<AppHeader />}>
       <HelpText>
-        Acá se junta lo que ahorraste (o sumaste) en los días que quedaron dentro del rango. Podés
-        “gastarlo” en una comida especial, un extra o lo que elijas.
+        Lo ahorrado en días en rango. Gastalo en algo puntual; si también lo comés, registralo como comida.
       </HelpText>
 
       {guiltFree.length > 0 ? (
         <View className="mt-5">
           <AppText className="mb-1 font-semibold">Registrar sin culpa</AppText>
           <HelpText>
-            Siempre a mano, dentro del presupuesto de hoy. No hace falta saldo ni desbloquearlas.
+            Las marcás en Recientes al registrar comida. Van al presupuesto de hoy, no al saldo.
           </HelpText>
           {guiltFree.map((item) => (
             <View

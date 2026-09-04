@@ -46,6 +46,7 @@ export interface AppState {
   updateFood: (id: string, patch: Partial<Pick<FoodEntry, 'name' | 'calories'>>) => void;
   removeFood: (id: string) => void;
   toggleFavorite: (name: string) => void;
+  toggleGuiltFree: (name: string) => void;
   addExercise: (
     input: Omit<ExerciseEntry, 'id' | 'date' | 'caloriesCredit'> & {
       date?: string;
@@ -59,6 +60,10 @@ export interface AppState {
   removeExercise: (id: string) => void;
   spendSavings: (amount: number, note: string) => { ok: boolean; message: string };
   resetAll: () => void;
+}
+
+function emptySavings(): SavingsBalance {
+  return { totalSaved: 0, history: [] };
 }
 
 function withPoints<T extends { dailyLogs: Record<string, DailyLog>; savings: SavingsBalance }>(
@@ -78,6 +83,7 @@ function upsertCatalog(catalog: CatalogFood[], entry: FoodEntry): CatalogFood[] 
     servingLabel: entry.servingLabel,
     lastUsedAt: new Date().toISOString(),
     isFavorite: existing?.isFavorite ?? !!entry.isFavorite,
+    isGuiltFree: existing?.isGuiltFree ?? false,
   };
   return [next, ...catalog.filter((item) => item.name.trim().toLowerCase() !== key)].slice(
     0,
@@ -282,6 +288,28 @@ export const useAppStore = create<AppState>()(
           ),
         });
       },
+      toggleGuiltFree: (name) => {
+        const profile = get().profile;
+        if (!profile) return;
+        const key = name.trim().toLowerCase();
+        const item = get().catalog.find((entry) => entry.name.trim().toLowerCase() === key);
+        const current = profile.guiltFreeFoods ?? [];
+        const already = current.some((food) => food.name.trim().toLowerCase() === key);
+        if (!already && current.length >= 3) return;
+        const guiltFreeFoods = already
+          ? current.filter((food) => food.name.trim().toLowerCase() !== key)
+          : item
+            ? [...current, { name: item.name, calories: item.calories }]
+            : current;
+        set({
+          catalog: get().catalog.map((entry) =>
+            entry.name.trim().toLowerCase() === key
+              ? { ...entry, isGuiltFree: !already }
+              : entry,
+          ),
+          profile: { ...profile, guiltFreeFoods },
+        });
+      },
       addExercise: (input) => {
         const profile = get().profile;
         if (!profile) return;
@@ -401,6 +429,9 @@ export const useAppStore = create<AppState>()(
         const merged = { ...current, ...saved };
         return {
           ...merged,
+          profile: merged.profile
+            ? { unitSystem: 'metric' as const, ...merged.profile }
+            : merged.profile,
           ...derivePoints(merged.dailyLogs ?? {}, merged.savings ?? emptySavings()),
         };
       },
